@@ -1,0 +1,234 @@
+name: UI Crawler QA Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DATABASE_URL: postgresql://revenew_user:dev_password@127.0.0.1:5432/revenew_os
+  DATABASE_SHADOW_URL: postgresql://revenew_user:dev_password@127.0.0.1:5432/revenew_os_shadow
+  JWT_SECRET: ci-test-secret
+  REDIS_HOST: 127.0.0.1
+  REDIS_PORT: 6379
+  REDIS_URL: redis://127.0.0.1:6379
+  UI_CRAWL_START_SERVICES: '0'
+  UI_CRAWL_WEB_URL: http://127.0.0.1:3022
+  UI_CRAWL_API_URL: http://127.0.0.1:3001
+  UI_CRAWL_AGENTS_URL: http://127.0.0.1:8000
+  PORT: '3022'
+  NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+
+jobs:
+  qa-gate-staging:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: revenew_user
+          POSTGRES_PASSWORD: dev_password
+          POSTGRES_DB: revenew_os
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U revenew_user -d revenew_os"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install agent dependencies
+        run: pip install -r apps/agents/requirements.txt
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare database
+        run: |
+          PGPASSWORD=dev_password psql -h 127.0.0.1 -U revenew_user -d postgres -c "CREATE DATABASE revenew_os_shadow;" || true
+          npm run db:generate --workspace packages/database
+          npm run db:migrate:deploy --workspace packages/database
+
+      - name: Start services
+        run: |
+          npm run dev --prefix apps/api > /tmp/revenew-api.log 2>&1 &
+          PORT=3022 NEXT_PUBLIC_API_URL=http://127.0.0.1:3001 npm run dev --prefix apps/web > /tmp/revenew-web.log 2>&1 &
+          python apps/agents/main.py > /tmp/revenew-agents.log 2>&1 &
+
+      - name: Wait for services
+        run: |
+          for i in {1..90}; do curl -fsS http://127.0.0.1:3001/health && break || sleep 2; done
+          for i in {1..90}; do curl -fsS http://127.0.0.1:8000/health && break || sleep 2; done
+          for i in {1..90}; do curl -fsS "http://127.0.0.1:3022/login?next=%2Fdashboard" && break || sleep 2; done
+
+      - name: Run staging QA gate
+        env:
+          CI: 'true'
+        run: npm run qa:ui:crawl:ci:staging
+
+      - name: Post QA gate comment on PR
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/post-qa-gate-comment.mjs
+
+      - name: Upload crawler artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-crawler-artifacts-staging
+          path: artifacts/ui-crawler/
+          if-no-files-found: warn
+
+      - name: Upload service logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-crawler-service-logs-staging
+          path: |
+            /tmp/revenew-api.log
+            /tmp/revenew-web.log
+            /tmp/revenew-agents.log
+          if-no-files-found: warn
+
+  qa-gate-production:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: revenew_user
+          POSTGRES_PASSWORD: dev_password
+          POSTGRES_DB: revenew_os
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U revenew_user -d revenew_os"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install agent dependencies
+        run: pip install -r apps/agents/requirements.txt
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare database
+        run: |
+          PGPASSWORD=dev_password psql -h 127.0.0.1 -U revenew_user -d postgres -c "CREATE DATABASE revenew_os_shadow;" || true
+          npm run db:generate --workspace packages/database
+          npm run db:migrate:deploy --workspace packages/database
+
+      - name: Start services
+        run: |
+          npm run dev --prefix apps/api > /tmp/revenew-api.log 2>&1 &
+          PORT=3022 NEXT_PUBLIC_API_URL=http://127.0.0.1:3001 npm run dev --prefix apps/web > /tmp/revenew-web.log 2>&1 &
+          python apps/agents/main.py > /tmp/revenew-agents.log 2>&1 &
+
+      - name: Wait for services
+        run: |
+          for i in {1..90}; do curl -fsS http://127.0.0.1:3001/health && break || sleep 2; done
+          for i in {1..90}; do curl -fsS http://127.0.0.1:8000/health && break || sleep 2; done
+          for i in {1..90}; do curl -fsS "http://127.0.0.1:3022/login?next=%2Fdashboard" && break || sleep 2; done
+
+      - name: Run production QA gate
+        env:
+          CI: 'true'
+        run: npm run qa:ui:crawl:ci:production
+
+      - name: Notify on production gate failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.UI_QA_GATE_SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.UI_QA_GATE_DISCORD_WEBHOOK_URL }}
+          OWNER_MENTION: ${{ secrets.UI_QA_GATE_OWNER_MENTION }}
+          STAFF_MENTION: ${{ secrets.UI_QA_GATE_STAFF_MENTION }}
+          DELIVERY_MANAGER_MENTION: ${{ secrets.UI_QA_GATE_DELIVERY_MANAGER_MENTION }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+        run: npm run qa:ui:gate:notify
+
+      - name: Upload crawler artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-crawler-artifacts-production
+          path: artifacts/ui-crawler/
+          if-no-files-found: warn
+
+      - name: Upload service logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-crawler-service-logs-production
+          path: |
+            /tmp/revenew-api.log
+            /tmp/revenew-web.log
+            /tmp/revenew-agents.log
+          if-no-files-found: warn

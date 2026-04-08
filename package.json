@@ -1,0 +1,41 @@
+{
+  "name": "revenew-os",
+  "version": "0.1.0",
+  "description": "AI-powered revenue intelligence platform for Nigerian fintech, SaaS, logistics, and e-commerce",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "pnpm@8.0.0",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "smoke:ui": "node scripts/smoke_ui.mjs",
+    "qa:ui:crawl": "node scripts/ui_crawler.mjs",
+    "qa:ui:crawl:ci": "node scripts/run_ui_crawl_profile.mjs staging",
+    "qa:ui:crawl:ci:staging": "node scripts/run_ui_crawl_profile.mjs staging",
+    "qa:ui:crawl:ci:production": "node scripts/run_ui_crawl_profile.mjs production",
+    "qa:ui:gate:comment": "node scripts/post-qa-gate-comment.mjs",
+    "qa:ui:gate:notify": "node scripts/notify-qa-gate-failure.mjs",
+    "db:migrate": "turbo run db:migrate",
+    "db:seed": "turbo run db:seed",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "playwright": "^1.54.2",
+    "prettier": "^3.0.0",
+    "turbo": "^1.10.0",
+    "typescript": "^5.0.0"
+  }
+}
