@@ -1,0 +1,39 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "revenew-web",
+      "image": "revenew-web:latest",
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "hostPort": 3000
+        }
+      ]
+    },
+    {
+      "name": "revenew-api",
+      "image": "revenew-api:latest",
+      "portMappings": [
+        {
+          "containerPort": 3001,
+          "hostPort": 3001
+        }
+      ]
+    },
+    {
+      "name": "revenew-agents",
+      "image": "revenew-agents:latest",
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000
+        }
+      ]
+    }
+  ],
+  "family": "revenew-os",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024"
+}

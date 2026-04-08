@@ -1,0 +1,1 @@
+export { default } from '../../benchmarking/page';

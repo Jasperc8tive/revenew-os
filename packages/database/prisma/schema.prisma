@@ -1,0 +1,1047 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Industry {
+  FINTECH
+  SAAS
+  LOGISTICS
+  ECOMMERCE
+  OTHER
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  STAFF
+  DELIVERY_MANAGER
+  VIEWER
+}
+
+enum IntegrationProvider {
+  GOOGLE_ADS
+  META_ADS
+  TIKTOK_ADS
+  LINKEDIN_ADS
+  TWITTER_ADS
+  PAYSTACK
+  FLUTTERWAVE
+  STRIPE
+  MONNIFY
+  INTERSWITCH
+  HUBSPOT
+  SALESFORCE
+  ZOHO
+  PIPEDRIVE
+  GOOGLE_ANALYTICS
+  MIXPANEL
+  AMPLITUDE
+  POSTHOG
+  TWILIO
+  TERMII
+  SENDGRID
+  MAILCHIMP
+  BIGQUERY
+  SNOWFLAKE
+  REDSHIFT
+  DATABRICKS
+  OTHER
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  PENDING
+}
+
+enum IntegrationSyncStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
+  RUNNING
+  PENDING
+}
+
+enum MarketingChannelType {
+  PAID_SEARCH
+  PAID_SOCIAL
+  ORGANIC
+  EMAIL
+  SMS
+  WHATSAPP
+  REFERRAL
+  OTHER
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum DealStageType {
+  LEAD
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum CustomerEventType {
+  SIGNUP
+  LOGIN
+  PAGE_VIEW
+  PURCHASE
+  RENEWAL
+  CHURN
+  CUSTOM
+}
+
+enum CurrencyCode {
+  NGN
+  USD
+  GBP
+  EUR
+}
+
+enum RevenueEventType {
+  SUBSCRIPTION_STARTED
+  SUBSCRIPTION_RENEWED
+  UPGRADE
+  DOWNGRADE
+  ONE_TIME_PURCHASE
+  REFUND
+}
+
+enum AgentType {
+  MARKETING
+  ACQUISITION
+  PIPELINE
+  FORECASTING
+  PRICING
+  RETENTION
+  GROWTH
+}
+
+enum ImpactLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RecommendationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  APPLIED
+}
+
+enum ExecutionStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum CopilotRole {
+  USER
+  ASSISTANT
+}
+
+enum ExperimentStatus {
+  DRAFT
+  RUNNING
+  COMPLETED
+  PAUSED
+}
+
+enum AlertMetric {
+  CAC
+  LTV
+  CHURN
+  REVENUE
+}
+
+enum AlertOperator {
+  GT
+  LT
+  CHANGE_PCT
+}
+
+enum AlertEventStatus {
+  SENT
+  FAILED
+}
+
+enum DataQualityEventType {
+  VALIDATION
+  ANOMALY
+}
+
+enum DataQualitySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum DataQualitySource {
+  INGESTION
+  ANALYTICS
+  INTEGRATION_MONITORING
+}
+
+enum VerifiedMetricWindow {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum CompetitorSignalType {
+  TRAFFIC
+  HIRING
+  AD_SPEND
+  PRODUCT_LAUNCH
+  OTHER
+}
+
+enum PlanTier {
+  Starter
+  Growth
+  Enterprise
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  OVERDUE
+  CANCELED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  phoneNumber  String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships Membership[]
+
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  industry  Industry
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships          Membership[]
+  roles                Role[]
+  integrations         Integration[]
+  channels             MarketingChannel[]
+  campaigns            MarketingCampaign[]
+  marketingMetrics     MarketingMetric[]
+  pipelines            SalesPipeline[]
+  deals                Deal[]
+  customers            Customer[]
+  customerEvents       CustomerEvent[]
+  sessions             Session[]
+  revenueEvents        RevenueEvent[]
+  subscriptions        Subscription[]
+  invoices             Invoice[]
+  payments             Payment[]
+  agentInsights        AgentInsight[]
+  recommendations      Recommendation[]
+  agentLogs            AgentExecutionLog[]
+  dailyMetrics         DailyMetrics[]
+  weeklyMetrics        WeeklyMetrics[]
+  monthlyMetrics       MonthlyMetrics[]
+  copilotConversations CopilotConversation[]
+  experiments          Experiment[]
+  alertRules           AlertRule[]
+  competitors          Competitor[]
+  dataQualityEvents    DataQualityEvent[]
+  verifiedMetricSnapshots VerifiedMetricSnapshot[]
+
+  @@index([industry])
+  @@index([createdAt])
+  @@map("organizations")
+}
+
+model Role {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships  Membership[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("roles")
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MembershipRole
+  roleId         String?
+  createdAt      DateTime       @default(now())
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  roleDefinition Role?        @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([role])
+  @@map("memberships")
+}
+
+model Integration {
+  id             String              @id @default(cuid())
+  organizationId String
+  provider       IntegrationProvider
+  status         IntegrationStatus   @default(PENDING)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  credentials  IntegrationCredential[]
+  syncLogs     IntegrationSyncLog[]
+  channels     MarketingChannel[]
+  dataQualityEvents DataQualityEvent[]
+
+  @@unique([organizationId, provider])
+  @@index([organizationId])
+  @@index([provider])
+  @@index([status])
+  @@map("integrations")
+}
+
+model IntegrationCredential {
+  id             String   @id @default(cuid())
+  integrationId  String
+  encryptedToken String
+  refreshToken   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@map("integration_credentials")
+}
+
+model IntegrationSyncLog {
+  id            String                @id @default(cuid())
+  integrationId String
+  status        IntegrationSyncStatus
+  syncedAt      DateTime              @default(now())
+  errorMessage  String?
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([status])
+  @@index([syncedAt])
+  @@map("integration_sync_logs")
+}
+
+model DataQualityEvent {
+  id             String               @id @default(cuid())
+  organizationId String
+  integrationId  String?
+  dedupeKey      String?
+  eventType      DataQualityEventType
+  severity       DataQualitySeverity
+  source         DataQualitySource
+  code           String
+  message        String
+  details        Json?
+  occurredAt     DateTime             @default(now())
+  createdAt      DateTime             @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  integration  Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([integrationId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([source])
+  @@index([occurredAt])
+  @@unique([organizationId, code, dedupeKey])
+  @@map("data_quality_events")
+}
+
+model MarketingChannel {
+  id             String               @id @default(cuid())
+  organizationId String
+  integrationId  String?
+  name           String
+  type           MarketingChannelType
+  createdAt      DateTime             @default(now())
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  integration  Integration?        @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  campaigns    MarketingCampaign[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([type])
+  @@map("marketing_channels")
+}
+
+model MarketingCampaign {
+  id             String         @id @default(cuid())
+  organizationId String
+  channelId      String
+  name           String
+  status         CampaignStatus @default(DRAFT)
+  startDate      DateTime?
+  endDate        DateTime?
+  createdAt      DateTime       @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel      MarketingChannel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  metrics      MarketingMetric[]
+
+  @@index([organizationId])
+  @@index([channelId])
+  @@index([status])
+  @@map("marketing_campaigns")
+}
+
+model MarketingMetric {
+  id             String   @id @default(cuid())
+  organizationId String
+  campaignId     String
+  impressions    Int      @default(0)
+  clicks         Int      @default(0)
+  cost           Decimal  @db.Decimal(18, 2)
+  conversions    Int      @default(0)
+  date           DateTime @db.Date
+  createdAt      DateTime @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([campaignId])
+  @@index([date])
+  @@index([organizationId, date])
+  @@index([campaignId, date])
+  @@index([organizationId, campaignId, date])
+  @@map("marketing_metrics")
+}
+
+model SalesPipeline {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stages       DealStage[]
+  deals        Deal[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("sales_pipelines")
+}
+
+model DealStage {
+  id         String        @id @default(cuid())
+  pipelineId String
+  name       String
+  type       DealStageType
+  sequence   Int           @default(0)
+  createdAt  DateTime      @default(now())
+
+  pipeline SalesPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals    Deal[]
+
+  @@unique([pipelineId, sequence])
+  @@index([pipelineId])
+  @@map("deal_stages")
+}
+
+model Deal {
+  id             String        @id @default(cuid())
+  organizationId String
+  pipelineId     String
+  stageId        String
+  value          Decimal       @db.Decimal(18, 2)
+  stage          DealStageType
+  probability    Int           @default(0)
+  closeDate      DateTime?
+  createdAt      DateTime      @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pipeline     SalesPipeline @relation(fields: [pipelineId], references: [id], onDelete: Restrict)
+  dealStage    DealStage     @relation(fields: [stageId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([pipelineId])
+  @@index([stageId])
+  @@index([stage])
+  @@index([closeDate])
+  @@map("deals")
+}
+
+model Customer {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  email              String
+  firstSeen          DateTime @default(now())
+  acquisitionChannel String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  events        CustomerEvent[]
+  sessions      Session[]
+  revenueEvents RevenueEvent[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([firstSeen])
+  @@index([acquisitionChannel])
+  @@map("customers")
+}
+
+model CustomerEvent {
+  id             String            @id @default(cuid())
+  organizationId String
+  customerId     String
+  eventType      CustomerEventType
+  metadata       Json?
+  timestamp      DateTime          @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@index([organizationId, timestamp])
+  @@index([organizationId, eventType, timestamp])
+  @@index([customerId, timestamp])
+  @@map("customer_events")
+}
+
+model Session {
+  id             String    @id @default(cuid())
+  organizationId String
+  customerId     String
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([startedAt])
+  @@map("sessions")
+}
+
+model Plan {
+  id           String       @id @default(cuid())
+  name         String
+  tier         PlanTier     @unique
+  priceMonthly Decimal      @db.Decimal(18, 2)
+  priceYearly  Decimal?     @db.Decimal(18, 2)
+  currency     CurrencyCode @default(NGN)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id              String             @id @default(cuid())
+  organizationId  String
+  planId          String
+  status          SubscriptionStatus @default(TRIAL)
+  billingInterval BillingInterval    @default(MONTHLY)
+  startDate       DateTime           @default(now())
+  endDate         DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan          Plan           @relation(fields: [planId], references: [id], onDelete: Restrict)
+  invoices      Invoice[]
+  payments      Payment[]
+  revenueEvents RevenueEvent[]
+
+  @@index([organizationId])
+  @@index([planId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  organizationId String
+  subscriptionId String
+  invoiceNumber  String
+  amount         Decimal       @db.Decimal(18, 2)
+  currency       CurrencyCode  @default(NGN)
+  status         InvoiceStatus @default(DRAFT)
+  dueDate        DateTime
+  issuedAt       DateTime      @default(now())
+  paidAt         DateTime?
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription  Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  payments      Payment[]
+  revenueEvents RevenueEvent[]
+
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  organizationId String
+  subscriptionId String?
+  invoiceId      String?
+  amount         Decimal       @db.Decimal(18, 2)
+  currency       CurrencyCode  @default(NGN)
+  status         PaymentStatus @default(PENDING)
+  reference      String        @unique
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  invoice      Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([subscriptionId])
+  @@index([invoiceId])
+  @@index([status])
+  @@map("payments")
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  eventId     String
+  eventType   String
+  reference   String?
+  status      String    @default("RECEIVED")
+  payload     Json
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([provider, eventId])
+  @@index([provider])
+  @@index([status])
+  @@index([createdAt])
+  @@map("webhook_events")
+}
+
+model RevenueEvent {
+  id             String           @id @default(cuid())
+  organizationId String
+  customerId     String?
+  subscriptionId String?
+  invoiceId      String?
+  amount         Decimal          @db.Decimal(18, 2)
+  currency       CurrencyCode     @default(NGN)
+  eventType      RevenueEventType
+  timestamp      DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  invoice      Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@index([subscriptionId])
+  @@index([organizationId, timestamp])
+  @@index([organizationId, eventType, timestamp])
+  @@index([organizationId, customerId, timestamp])
+  @@map("revenue_events")
+}
+
+model AgentInsight {
+  id             String      @id @default(cuid())
+  organizationId String
+  agentType      AgentType
+  insight        String
+  impactLevel    ImpactLevel
+  confidenceScore Decimal?    @db.Decimal(6, 4)
+  dataPoints      Int?
+  dataWindowStart DateTime?
+  dataWindowEnd   DateTime?
+  evidence        Json?
+  explanationWhat String?
+  explanationWhy  String?
+  explanationAction String?
+  suppressionReason String?
+  traceId         String?
+  createdAt      DateTime    @default(now())
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recommendations Recommendation[]
+
+  @@index([organizationId])
+  @@index([agentType])
+  @@index([impactLevel])
+  @@index([createdAt])
+  @@index([traceId])
+  @@map("agent_insights")
+}
+
+model Recommendation {
+  id             String               @id @default(cuid())
+  organizationId String
+  insightId      String?
+  recommendation String
+  expectedImpact String?
+  confidenceScore Decimal?             @db.Decimal(6, 4)
+  evidence        Json?
+  rationale       String?
+  assumptions     Json?
+  priority        Int?
+  traceId         String?
+  status         RecommendationStatus @default(PENDING)
+  createdAt      DateTime             @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  insight      AgentInsight? @relation(fields: [insightId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([insightId])
+  @@index([status])
+  @@index([traceId])
+  @@map("recommendations")
+}
+
+model AgentExecutionLog {
+  id             String          @id @default(cuid())
+  organizationId String
+  agentType      AgentType
+  status         ExecutionStatus @default(RUNNING)
+  startedAt      DateTime        @default(now())
+  completedAt    DateTime?
+  errorMessage   String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([agentType])
+  @@index([status])
+  @@index([startedAt])
+  @@map("agent_execution_logs")
+}
+
+model VerifiedMetricSnapshot {
+  id               String               @id @default(cuid())
+  organizationId   String
+  metricKey        String
+  windowType       VerifiedMetricWindow
+  windowStart      DateTime
+  windowEnd        DateTime
+  metricValue      Decimal              @db.Decimal(18, 4)
+  formulaVersion   String
+  sourceTables     Json
+  sampleSize       Int
+  dataQualityFlags Json?
+  inputs           Json?
+  verifiedAt       DateTime             @default(now())
+  createdAt        DateTime             @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, metricKey, windowType, windowStart, windowEnd])
+  @@index([organizationId, windowType, windowStart, windowEnd])
+  @@index([metricKey])
+  @@index([verifiedAt])
+  @@map("verified_metric_snapshots")
+}
+
+model DailyMetrics {
+  id             String   @id @default(cuid())
+  organizationId String
+  date           DateTime @db.Date
+  cac            Decimal  @db.Decimal(18, 2)
+  ltv            Decimal  @db.Decimal(18, 2)
+  revenue        Decimal  @db.Decimal(18, 2)
+  churn          Decimal  @db.Decimal(8, 4)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, date])
+  @@index([organizationId])
+  @@index([date])
+  @@map("daily_metrics")
+}
+
+model WeeklyMetrics {
+  id             String   @id @default(cuid())
+  organizationId String
+  weekStart      DateTime @db.Date
+  cac            Decimal  @db.Decimal(18, 2)
+  ltv            Decimal  @db.Decimal(18, 2)
+  revenue        Decimal  @db.Decimal(18, 2)
+  churn          Decimal  @db.Decimal(8, 4)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, weekStart])
+  @@index([organizationId])
+  @@index([weekStart])
+  @@map("weekly_metrics")
+}
+
+model MonthlyMetrics {
+  id             String   @id @default(cuid())
+  organizationId String
+  monthStart     DateTime @db.Date
+  cac            Decimal  @db.Decimal(18, 2)
+  ltv            Decimal  @db.Decimal(18, 2)
+  revenue        Decimal  @db.Decimal(18, 2)
+  churn          Decimal  @db.Decimal(8, 4)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, monthStart])
+  @@index([organizationId])
+  @@index([monthStart])
+  @@map("monthly_metrics")
+}
+
+model IndustryBenchmark {
+  id          String      @id @default(cuid())
+  industry    Industry
+  metric      AlertMetric
+  periodStart DateTime    @db.Date
+  periodEnd   DateTime    @db.Date
+  median      Decimal     @db.Decimal(18, 4)
+  p25         Decimal     @db.Decimal(18, 4)
+  p75         Decimal     @db.Decimal(18, 4)
+  sampleCount Int
+  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime    @default(now())
+
+  @@unique([industry, metric, periodStart, periodEnd])
+  @@index([industry, metric])
+  @@index([periodStart, periodEnd])
+  @@map("industry_benchmarks")
+}
+
+model CopilotConversation {
+  id             String   @id @default(cuid())
+  organizationId String
+  title          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages     CopilotMessage[]
+
+  @@index([organizationId])
+  @@index([createdAt])
+  @@map("copilot_conversations")
+}
+
+model CopilotMessage {
+  id              String      @id @default(cuid())
+  conversationId  String
+  role            CopilotRole
+  content         String
+  contextSnapshot Json?
+  createdAt       DateTime    @default(now())
+
+  conversation CopilotConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("copilot_messages")
+}
+
+model Experiment {
+  id             String           @id @default(cuid())
+  organizationId String
+  title          String
+  hypothesis     String
+  status         ExperimentStatus @default(DRAFT)
+  targetMetric   AlertMetric
+  startDate      DateTime?
+  endDate        DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  variants     ExperimentVariant[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("experiments")
+}
+
+model ExperimentVariant {
+  id           String   @id @default(cuid())
+  experimentId String
+  name         String
+  description  String?
+  isControl    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  experiment Experiment         @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  results    ExperimentResult[]
+
+  @@unique([experimentId, name])
+  @@index([experimentId])
+  @@map("experiment_variants")
+}
+
+model ExperimentResult {
+  id          String   @id @default(cuid())
+  variantId   String
+  periodStart DateTime @db.Date
+  periodEnd   DateTime @db.Date
+  metricValue Decimal  @db.Decimal(18, 4)
+  sampleSize  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  variant ExperimentVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, periodStart, periodEnd])
+  @@index([variantId])
+  @@index([periodStart, periodEnd])
+  @@map("experiment_results")
+}
+
+model AlertRule {
+  id             String        @id @default(cuid())
+  organizationId String
+  name           String
+  metric         AlertMetric
+  operator       AlertOperator
+  threshold      Decimal       @db.Decimal(18, 4)
+  channels       Json
+  active         Boolean       @default(true)
+  lastCheckedAt  DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  events       AlertEvent[]
+
+  @@index([organizationId])
+  @@index([active])
+  @@index([metric])
+  @@map("alert_rules")
+}
+
+model AlertEvent {
+  id              String           @id @default(cuid())
+  ruleId          String
+  firedAt         DateTime         @default(now())
+  metricValue     Decimal          @db.Decimal(18, 4)
+  status          AlertEventStatus
+  deliveryDetails Json?
+  createdAt       DateTime         @default(now())
+
+  rule AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId])
+  @@index([firedAt])
+  @@index([status])
+  @@map("alert_events")
+}
+
+model Competitor {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  website        String?
+  industry       Industry?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  signals      CompetitorSignal[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("competitors")
+}
+
+model CompetitorSignal {
+  id           String               @id @default(cuid())
+  competitorId String
+  signalType   CompetitorSignalType
+  value        String
+  unit         String?
+  source       String?
+  date         DateTime             @db.Date
+  notes        String?
+  createdAt    DateTime             @default(now())
+
+  competitor Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+
+  @@index([competitorId])
+  @@index([signalType])
+  @@index([date])
+  @@map("competitor_signals")
+}

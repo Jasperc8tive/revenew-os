@@ -1,0 +1,17 @@
+# Prometheus metrics collection configuration
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'revenew-api'
+    static_configs:
+      - targets: ['localhost:3001']
+
+  - job_name: 'revenew-agents'
+    static_configs:
+      - targets: ['localhost:8000']
+
+  - job_name: 'revenew-postgres'
+    static_configs:
+      - targets: ['localhost:5432']

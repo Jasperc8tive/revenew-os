@@ -1,0 +1,17 @@
+{
+  "default": true,
+  "MD031": false,
+  "MD040": false,
+  "overrides": [
+    {
+      "files": [
+        "ROUTING.md",
+        "PHASE4_GUIDE.md"
+      ],
+      "MD013": false,
+      "MD022": false,
+      "MD026": false,
+      "MD032": false
+    }
+  ]
+}
