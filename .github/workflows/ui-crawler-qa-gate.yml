@@ -105,6 +105,7 @@ jobs:
       - name: Run staging QA gate
         env:
           CI: 'true'
+          UI_CRAWL_START_SERVICES: '0'
         run: npm run qa:ui:crawl:ci:staging
 
       - name: Post QA gate comment on PR
@@ -207,6 +208,7 @@ jobs:
       - name: Run production QA gate
         env:
           CI: 'true'
+          UI_CRAWL_START_SERVICES: '0'
         run: npm run qa:ui:crawl:ci:production
 
       - name: Force failure for notification smoke test

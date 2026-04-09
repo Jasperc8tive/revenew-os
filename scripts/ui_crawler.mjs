@@ -16,7 +16,7 @@ const WEB_URL = process.env.UI_CRAWL_WEB_URL || 'http://localhost:3002';
 const AGENTS_URL = process.env.UI_CRAWL_AGENTS_URL || 'http://localhost:8000';
 const MAX_PAGES = Number(process.env.UI_CRAWL_MAX_PAGES || 60);
 const CLICK_LIMIT_PER_PAGE = Number(process.env.UI_CRAWL_MAX_CLICKS || 25);
-const START_SERVICES = process.env.UI_CRAWL_START_SERVICES !== '0';
+const START_SERVICES = String(process.env.UI_CRAWL_START_SERVICES ?? '').trim() !== '0';
 const HEADLESS = process.env.UI_CRAWL_HEADLESS !== '0';
 const GATE_ENFORCED = process.env.UI_CRAWL_GATE_ENFORCE
   ? process.env.UI_CRAWL_GATE_ENFORCE !== '0'

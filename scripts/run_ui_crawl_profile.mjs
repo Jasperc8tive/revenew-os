@@ -51,6 +51,7 @@ for (const [key, value] of Object.entries(PROFILE_DEFAULTS[profile])) {
 const config = {
   profile,
   gateEnforced: env.UI_CRAWL_GATE_ENFORCE,
+  startServices: env.UI_CRAWL_START_SERVICES,
   webUrl: env.UI_CRAWL_WEB_URL || 'http://localhost:3002',
   maxPages: env.UI_CRAWL_MAX_PAGES,
   maxClicks: env.UI_CRAWL_MAX_CLICKS,
