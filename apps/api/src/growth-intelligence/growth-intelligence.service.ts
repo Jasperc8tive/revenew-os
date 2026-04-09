@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { BillingAccessService } from '../billing/billing-access.service';
 
-interface GraphNode {
+export interface GraphNode {
   id: string;
   type: 'organization' | 'metric' | 'recommendation' | 'experiment' | 'competitor_signal';
   label: string;
@@ -10,7 +10,7 @@ interface GraphNode {
   metadata?: Record<string, unknown>;
 }
 
-interface GraphEdge {
+export interface GraphEdge {
   source: string;
   target: string;
   relation:
