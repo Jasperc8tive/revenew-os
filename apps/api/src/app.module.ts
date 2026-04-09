@@ -23,6 +23,7 @@ import { AdminModule } from './admin/admin.module';
 import { ReportsModule } from './reports/reports.module';
 import { GrowthIntelligenceModule } from './growth-intelligence/growth-intelligence.module';
 import { GovernanceModule } from './governance/governance.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -53,7 +54,7 @@ import { GovernanceModule } from './governance/governance.module';
     GrowthIntelligenceModule,
     GovernanceModule,
   ],
-  controllers: [],
+  controllers: [HealthController],
   providers: [],
 })
 export class AppModule {}
