@@ -10,6 +10,7 @@ describe('ForecastingController (e2e)', () => {
 
   const forecastingServiceMock = {
     simulate: jest.fn(),
+    simulateScenarios: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -71,6 +72,32 @@ describe('ForecastingController (e2e)', () => {
     await request(app.getHttpServer())
       .post('/forecasting/simulate')
       .send({ organizationId: 'org-1', months: 50 }) // exceeds Max(24)
+      .expect(400);
+  });
+
+  it('POST /forecasting/scenarios returns multiple confidence-tagged scenarios', async () => {
+    forecastingServiceMock.simulateScenarios.mockImplementation(async () => ({
+      organizationId: 'org-1',
+      scenarios: [
+        { name: 'conservative', confidence: 'high', deltaPct: 3.2 },
+        { name: 'aggressive', confidence: 'medium', deltaPct: 18.5 },
+      ],
+      recommendationLinks: [{ id: 'rec-1', recommendation: 'Expand offer bundling' }],
+    }));
+
+    const response = await request(app.getHttpServer())
+      .post('/forecasting/scenarios')
+      .send({ organizationId: 'org-1', months: 6 })
+      .expect(201);
+
+    expect(response.body.scenarios).toHaveLength(2);
+    expect(response.body.recommendationLinks[0].id).toBe('rec-1');
+  });
+
+  it('POST /forecasting/scenarios validates numeric scenario controls', async () => {
+    await request(app.getHttpServer())
+      .post('/forecasting/scenarios')
+      .send({ organizationId: 'org-1', conversionRateDeltaPct: 'bad-value' })
       .expect(400);
   });
 });

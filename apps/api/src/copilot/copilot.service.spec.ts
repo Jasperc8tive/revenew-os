@@ -6,6 +6,7 @@ import { CopilotService } from './copilot.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { BillingAccessService } from '../billing/billing-access.service';
+import { GrowthIntelligenceService } from '../growth-intelligence/growth-intelligence.service';
 import * as LlmAdapterModule from './llm-adapter';
 
 describe('CopilotService', () => {
@@ -57,6 +58,10 @@ describe('CopilotService', () => {
     assertFeatureAccess: jest.fn(),
   };
 
+  const growthIntelligenceMock = {
+    getStrategicContext: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -67,6 +72,10 @@ describe('CopilotService', () => {
 
     billingAccessMock.assertFeatureAccess.mockImplementation(async () => undefined);
     analyticsMock.getExecutiveSummary.mockImplementation(async () => ({ ...mockSummary }));
+    growthIntelligenceMock.getStrategicContext.mockImplementation(async () => ({
+      organizationId: 'org-1',
+      strategicHighlights: [{ id: 'recommendation:rec-1', score: 0.81 }],
+    }));
     prismaMock.recommendation.findMany.mockImplementation(async () => []);
     prismaMock.copilotConversation.findFirst.mockImplementation(async () => ({ ...mockConversation }));
     prismaMock.copilotMessage.create
@@ -93,6 +102,7 @@ describe('CopilotService', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: AnalyticsService, useValue: analyticsMock },
         { provide: BillingAccessService, useValue: billingAccessMock },
+        { provide: GrowthIntelligenceService, useValue: growthIntelligenceMock },
       ],
     }).compile();
 
@@ -142,6 +152,16 @@ describe('CopilotService', () => {
       const systemMessages = llmCallArg.messages.filter((m) => m.role === 'system');
       const recContextMsg = systemMessages.find((m) => m.content.includes('rec-1'));
       expect(recContextMsg).toBeDefined();
+    });
+
+    it('includes growth intelligence graph context in LLM system messages', async () => {
+      await service.chat(chatInput);
+
+      const llmCallArg = (generateFn.mock.calls[0] as [{ messages: Array<{ role: string; content: string }> }])[0];
+      const systemMessages = llmCallArg.messages.filter((m) => m.role === 'system');
+      const graphContext = systemMessages.find((m) => m.content.includes('Growth intelligence graph context'));
+      expect(graphContext).toBeDefined();
+      expect(growthIntelligenceMock.getStrategicContext).toHaveBeenCalledWith('org-1');
     });
 
     describe('fallback path (adapter throws)', () => {

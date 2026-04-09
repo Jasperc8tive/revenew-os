@@ -17,6 +17,7 @@ describe('CompetitiveController (e2e)', () => {
     getOverview: jest.fn(),
     getSignalTrend: jest.fn(),
     getCompetitorComparison: jest.fn(),
+    getActionableDeltas: jest.fn(),
     generateWeeklyBrief: jest.fn(),
     evaluateAlerts: jest.fn(),
   };
@@ -256,5 +257,26 @@ describe('CompetitiveController (e2e)', () => {
     expect(response.body.rules).toHaveLength(1);
     expect(response.body.rules[0].triggered).toBe(true);
     expect(response.body.rules[0].actualCount).toBe(5);
+  });
+
+  it('GET /competitive/actionable-deltas returns relevance-ranked competitive actions', async () => {
+    svc.getActionableDeltas.mockImplementation(async () => ({
+      organizationId: 'org-1',
+      deltas: [
+        {
+          signalId: 'signal-1',
+          competitorName: 'Acme Retail',
+          relevanceScore: 0.91,
+          urgency: 'high',
+        },
+      ],
+    }));
+
+    const response = await request(app.getHttpServer())
+      .get('/competitive/actionable-deltas?organizationId=org-1&days=14')
+      .expect(200);
+
+    expect(svc.getActionableDeltas).toHaveBeenCalledWith('org-1', 14);
+    expect(response.body.deltas[0].urgency).toBe('high');
   });
 });

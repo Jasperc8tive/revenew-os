@@ -26,4 +26,14 @@ export class SimulateDto {
   @Min(1)
   @Max(24)
   months?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  conversionRateDeltaPct?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  averageOrderValueDeltaPct?: number;
 }

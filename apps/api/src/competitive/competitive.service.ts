@@ -80,6 +80,22 @@ export class CompetitiveService {
       throw new BadRequestException('Invalid signal date');
     }
 
+    const existing = await this.prisma.competitorSignal.findFirst({
+      where: {
+        competitorId: input.competitorId,
+        signalType: input.signalType,
+        value: input.value.trim(),
+        source: input.source?.trim() || null,
+        date: signalDate,
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const relevanceScore = this.computeSignalRelevanceScore(input.signalType, input.source, input.notes);
+
     return this.prisma.competitorSignal.create({
       data: {
         competitorId: input.competitorId,
@@ -88,7 +104,7 @@ export class CompetitiveService {
         unit: input.unit?.trim() || null,
         source: input.source?.trim() || null,
         date: signalDate,
-        notes: input.notes?.trim() || null,
+        notes: this.attachSignalMeta(input.notes, relevanceScore),
       },
     });
   }
@@ -258,6 +274,64 @@ export class CompetitiveService {
     return { days, competitors: entries };
   }
 
+  async getActionableDeltas(organizationId: string, days = 14) {
+    await this.billingAccessService.assertFeatureAccess(organizationId, 'analytics.full');
+
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const signals = await this.prisma.competitorSignal.findMany({
+      where: {
+        competitor: { organizationId },
+        date: { gte: since },
+      },
+      include: {
+        competitor: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: [{ date: 'desc' }],
+      take: 100,
+    });
+
+    const deltas = signals
+      .map((signal) => {
+        const relevanceScore = this.computeSignalRelevanceScore(signal.signalType, signal.source, signal.notes);
+        const urgency = relevanceScore >= 0.85 ? 'high' : relevanceScore >= 0.7 ? 'medium' : 'low';
+
+        return {
+          signalId: signal.id,
+          competitorId: signal.competitor.id,
+          competitorName: signal.competitor.name,
+          signalType: signal.signalType,
+          observedValue: signal.value,
+          observedAt: signal.date.toISOString(),
+          relevanceScore,
+          urgency,
+          suggestedAction:
+            signal.signalType === CompetitorSignalType.PRODUCT_LAUNCH
+              ? 'Review feature parity and position differentiators in campaign messaging.'
+              : signal.signalType === CompetitorSignalType.AD_SPEND
+                ? 'Audit paid channel efficiency and protect high-intent cohorts.'
+                : signal.signalType === CompetitorSignalType.HIRING
+                  ? 'Track category expansion risk and update account defense plan.'
+                  : 'Monitor signal trajectory and incorporate into weekly strategy sync.',
+        };
+      })
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, 20);
+
+    return {
+      organizationId,
+      windowDays: days,
+      deltas,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async generateWeeklyBrief(
     organizationId: string,
   ): Promise<{ brief: string; generatedAt: string; signalCount: number }> {
@@ -307,7 +381,7 @@ export class CompetitiveService {
       },
       {
         role: 'user',
-        content: `Competitor signals logged in the past 7 days:\n\n${signalLines}\n\nGenerate the weekly competitive intelligence brief.`,
+        content: `Competitor signals logged in the past 7 days:\n\n${signalLines}\n\nGenerate the weekly competitive intelligence brief including competitive deltas and action priorities.`,
       },
     ];
 
@@ -370,5 +444,38 @@ export class CompetitiveService {
     );
 
     return { rules: results, evaluatedAt: new Date().toISOString() };
+  }
+
+  private computeSignalRelevanceScore(
+    signalType: CompetitorSignalType,
+    source?: string | null,
+    notes?: string | null,
+  ) {
+    const baseWeight: Record<CompetitorSignalType, number> = {
+      TRAFFIC: 0.8,
+      HIRING: 0.68,
+      AD_SPEND: 0.86,
+      PRODUCT_LAUNCH: 0.92,
+      OTHER: 0.55,
+    };
+
+    const sourceBoost = source ? 0.05 : 0;
+    const notesBoost = notes && notes.toLowerCase().includes('verified') ? 0.08 : 0;
+    return Number(Math.min(baseWeight[signalType] + sourceBoost + notesBoost, 1).toFixed(4));
+  }
+
+  private attachSignalMeta(notes: string | undefined, relevanceScore: number) {
+    const normalizedNotes = notes?.trim();
+    const marker = `[relevance:${relevanceScore.toFixed(2)}]`;
+
+    if (!normalizedNotes) {
+      return marker;
+    }
+
+    if (normalizedNotes.includes('[relevance:')) {
+      return normalizedNotes;
+    }
+
+    return `${normalizedNotes} ${marker}`;
   }
 }

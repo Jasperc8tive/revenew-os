@@ -21,6 +21,8 @@ import { AgentsModule } from './agents/agents.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { AdminModule } from './admin/admin.module';
 import { ReportsModule } from './reports/reports.module';
+import { GrowthIntelligenceModule } from './growth-intelligence/growth-intelligence.module';
+import { GovernanceModule } from './governance/governance.module';
 
 @Module({
   imports: [
@@ -48,6 +50,8 @@ import { ReportsModule } from './reports/reports.module';
     OnboardingModule,
     AdminModule,
     ReportsModule,
+    GrowthIntelligenceModule,
+    GovernanceModule,
   ],
   controllers: [],
   providers: [],

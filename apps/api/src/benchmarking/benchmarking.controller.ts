@@ -17,6 +17,11 @@ export class BenchmarkingController {
     return this.benchmarkingService.getBenchmarks(query);
   }
 
+  @Get('deep')
+  async getDeepBenchmarks(@Query() query: BenchmarkQueryDto) {
+    return this.benchmarkingService.getDeepBenchmarks(query);
+  }
+
   @Post('aggregate')
   async aggregateBenchmarks(
     @Body('startDate') startDate?: string,

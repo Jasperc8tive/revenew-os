@@ -12,4 +12,9 @@ export class ForecastingController {
   simulate(@Body() dto: SimulateDto) {
     return this.forecastingService.simulate(dto);
   }
+
+  @Post('scenarios')
+  simulateScenarios(@Body() dto: SimulateDto) {
+    return this.forecastingService.simulateScenarios(dto);
+  }
 }

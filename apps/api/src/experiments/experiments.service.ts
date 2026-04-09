@@ -11,9 +11,11 @@ import {
   ExperimentResult,
   ExperimentStatus,
   AlertMetric,
+  ImpactLevel,
   Prisma,
 } from '@prisma/client';
 import { BillingAccessService } from '../billing/billing-access.service';
+import { RecommendationsService } from '../recommendations/recommendations.service';
 import {
   CreateExperimentInput,
   UpdateExperimentInput,
@@ -27,6 +29,7 @@ export class ExperimentsService {
   constructor(
     private prisma: PrismaService,
     private billingAccessService: BillingAccessService,
+    private recommendationsService: RecommendationsService,
   ) {}
 
   /** Create a new growth experiment with hypothesis */
@@ -155,13 +158,90 @@ export class ExperimentsService {
       );
     }
 
-    return this.prisma.experiment.update({
+    const completed = await this.prisma.experiment.update({
       where: { id: experimentId },
       data: {
         status: ExperimentStatus.COMPLETED,
         endDate: new Date(),
       },
     });
+
+    const attribution = await this.getAttributionSummary(experimentId, organizationId);
+    if (attribution.winner && attribution.winner.upliftPercent > 5) {
+      await this.recommendationsService.persistAuditableRecommendation({
+        organizationId,
+        insight: `Experiment ${experiment.title} produced a measurable uplift`,
+        recommendation: `Operationalize winning variant ${attribution.winner.name} and feed pricing/offer strategy updates.`,
+        impactLevel: attribution.winner.upliftPercent > 15 ? ImpactLevel.HIGH : ImpactLevel.MEDIUM,
+        confidenceScore: attribution.confidenceScore,
+        dataPoints: attribution.winner.sampleSize,
+        dataWindow: {
+          startDate: completed.startDate?.toISOString() ?? new Date().toISOString(),
+          endDate: completed.endDate?.toISOString() ?? new Date().toISOString(),
+        },
+        evidence: {
+          experimentId,
+          attribution,
+        },
+        explanation: {
+          what: 'Experiment variant delivered uplift against control',
+          why: `Winning uplift ${attribution.winner.upliftPercent.toFixed(2)}%`,
+          action: 'Apply winning variant in production and monitor KPI drift',
+        },
+        traceId: `${organizationId}:experiment:${experimentId}:winner:${attribution.winner.id}`,
+      });
+    }
+
+    return completed;
+  }
+
+  async assignVariant(
+    experimentId: string,
+    organizationId: string,
+    identityKey: string,
+  ): Promise<{ variantId: string; variantName: string; bucket: number }> {
+    const experiment = await this.getExperiment(experimentId, organizationId);
+    if (experiment.variants.length === 0) {
+      throw new BadRequestException('No variants available for assignment.');
+    }
+
+    const variants = [...experiment.variants].sort((a, b) => a.id.localeCompare(b.id));
+    const bucket = this.hashIdentity(identityKey) % variants.length;
+    const variant = variants[bucket];
+
+    return {
+      variantId: variant.id,
+      variantName: variant.name,
+      bucket,
+    };
+  }
+
+  async getAttributionSummary(experimentId: string, organizationId: string) {
+    const stats = await this.getExperimentStats(experimentId, organizationId);
+    const winner = stats.variants
+      .filter((variant) => !variant.isControl && typeof variant.upliftPercent === 'number')
+      .sort((a, b) => (b.upliftPercent ?? 0) - (a.upliftPercent ?? 0))[0];
+
+    const confidenceScore = winner
+      ? Number(
+          Math.min((winner.sampleSize / 500) * 0.7 + Math.min((winner.upliftPercent ?? 0) / 20, 1) * 0.3, 1).toFixed(4),
+        )
+      : 0.4;
+
+    return {
+      experimentId,
+      confidenceScore,
+      winner: winner
+        ? {
+            id: winner.id,
+            name: winner.name,
+            upliftPercent: winner.upliftPercent ?? 0,
+            sampleSize: winner.sampleSize,
+          }
+        : null,
+      attributionQuality: winner && winner.sampleSize >= 200 ? 'high' : winner ? 'medium' : 'low',
+      variants: stats.variants,
+    };
   }
 
   /** Add a variant to experiment */
@@ -359,5 +439,14 @@ export class ExperimentsService {
       where: { id: experimentId },
       data: { status: ExperimentStatus.PAUSED },
     });
+  }
+
+  private hashIdentity(value: string) {
+    let hash = 0;
+    for (let i = 0; i < value.length; i += 1) {
+      hash = (hash * 31 + value.charCodeAt(i)) | 0;
+    }
+
+    return Math.abs(hash);
   }
 }

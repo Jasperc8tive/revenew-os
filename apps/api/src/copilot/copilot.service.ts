@@ -3,6 +3,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { BillingAccessService } from '../billing/billing-access.service';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { GrowthIntelligenceService } from '../growth-intelligence/growth-intelligence.service';
 import { createLlmAdapter, LlmMessage } from './llm-adapter';
 
 interface CreateConversationInput {
@@ -22,6 +23,7 @@ export class CopilotService {
     private readonly prisma: PrismaService,
     private readonly analyticsService: AnalyticsService,
     private readonly billingAccessService: BillingAccessService,
+    private readonly growthIntelligenceService: GrowthIntelligenceService,
   ) {}
 
   async createConversation(input: CreateConversationInput) {
@@ -111,9 +113,14 @@ export class CopilotService {
       },
     });
 
+    const strategicContext = await this.growthIntelligenceService.getStrategicContext(
+      input.organizationId,
+    );
+
     const contextSnapshot = {
       executiveSummary,
       recentRecommendations,
+      strategicContext,
       generatedAt: new Date().toISOString(),
     } as unknown as Prisma.InputJsonValue;
 
@@ -146,6 +153,10 @@ export class CopilotService {
       {
         role: 'system',
         content: `Recent recommendations context: ${JSON.stringify(recentRecommendations)}`,
+      },
+      {
+        role: 'system',
+        content: `Growth intelligence graph context: ${JSON.stringify(strategicContext)}`,
       },
       ...conversation.messages.map((message) => ({
         role: (message.role === CopilotRole.USER ? 'user' : 'assistant') as 'user' | 'assistant',

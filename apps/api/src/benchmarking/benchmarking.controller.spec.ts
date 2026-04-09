@@ -12,6 +12,7 @@ describe('BenchmarkingController (e2e)', () => {
 
   const benchmarkingServiceMock = {
     getBenchmarks: jest.fn(),
+    getDeepBenchmarks: jest.fn(),
   };
 
   const benchmarkAggregationServiceMock = {
@@ -82,5 +83,23 @@ describe('BenchmarkingController (e2e)', () => {
       .expect(201);
 
     expect(response.body).toMatchObject({ rowCount: 120, benchmarkCount: 8 });
+  });
+
+  it('GET /benchmarks/deep should return confidence-ranked benchmark output', async () => {
+    benchmarkingServiceMock.getDeepBenchmarks.mockImplementation(async () => ({
+      organizationId: 'org-1',
+      rankedMetrics: [{ metric: AlertMetric.REVENUE, rankScore: 0.88 }],
+      cohorts: {
+        acquisitionChannels: [{ key: 'whatsapp', count: 12, share: 0.6 }],
+        customerAgeBands: [{ key: '0-30d', count: 8, share: 0.4 }],
+      },
+    }));
+
+    const response = await request(app.getHttpServer())
+      .get('/benchmarks/deep?organizationId=org-1')
+      .expect(200);
+
+    expect(response.body.rankedMetrics[0].metric).toBe(AlertMetric.REVENUE);
+    expect(response.body.cohorts.acquisitionChannels).toHaveLength(1);
   });
 });

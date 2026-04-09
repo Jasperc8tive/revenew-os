@@ -163,4 +163,21 @@ export class ExperimentsController {
       organizationId,
     );
   }
+
+  @Get(':experimentId/assignment')
+  async assignVariant(
+    @Query('organizationId') organizationId: string,
+    @Param('experimentId') experimentId: string,
+    @Query('identityKey') identityKey: string,
+  ) {
+    return this.experimentsService.assignVariant(experimentId, organizationId, identityKey);
+  }
+
+  @Get(':experimentId/attribution')
+  async attribution(
+    @Query('organizationId') organizationId: string,
+    @Param('experimentId') experimentId: string,
+  ) {
+    return this.experimentsService.getAttributionSummary(experimentId, organizationId);
+  }
 }

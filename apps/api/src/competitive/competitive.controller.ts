@@ -83,6 +83,17 @@ export class CompetitiveController {
     );
   }
 
+  @Get('actionable-deltas')
+  actionableDeltas(
+    @Query('organizationId') organizationId: string,
+    @Query('days') days?: string,
+  ) {
+    return this.competitiveService.getActionableDeltas(
+      organizationId,
+      days ? parseInt(days, 10) : 14,
+    );
+  }
+
   @Post('brief')
   @HttpCode(200)
   generateWeeklyBrief(@Body('organizationId') organizationId: string) {

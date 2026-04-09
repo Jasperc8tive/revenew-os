@@ -39,6 +39,8 @@ describe('ExperimentsController (e2e)', () => {
     addVariant: jest.fn(),
     recordResult: jest.fn(),
     getExperimentStats: jest.fn(),
+    assignVariant: jest.fn(),
+    getAttributionSummary: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -218,5 +220,33 @@ describe('ExperimentsController (e2e)', () => {
     expect(res.body.variants).toHaveLength(2);
     const treatment = res.body.variants.find((v: { isControl: boolean }) => !v.isControl);
     expect(treatment.upliftPercent).toBe(15);
+  });
+
+  it('GET /experiments/:id/assignment returns deterministic variant assignment', async () => {
+    svc.assignVariant.mockResolvedValue({ variantId: 'var-treat', variantName: 'Treatment A', bucket: 1 });
+
+    const res = await request(app.getHttpServer())
+      .get(`/experiments/${EXP}/assignment?organizationId=${ORG}&identityKey=user-42`)
+      .expect(200);
+
+    expect(res.body.variantId).toBe('var-treat');
+    expect(svc.assignVariant).toHaveBeenCalledWith(EXP, ORG, 'user-42');
+  });
+
+  it('GET /experiments/:id/attribution returns experiment impact attribution summary', async () => {
+    svc.getAttributionSummary.mockResolvedValue({
+      experimentId: EXP,
+      confidenceScore: 0.84,
+      winner: { id: 'var-treat', upliftPercent: 15.2, sampleSize: 320 },
+      attributionQuality: 'high',
+      variants: [],
+    });
+
+    const res = await request(app.getHttpServer())
+      .get(`/experiments/${EXP}/attribution?organizationId=${ORG}`)
+      .expect(200);
+
+    expect(res.body.attributionQuality).toBe('high');
+    expect(res.body.winner.id).toBe('var-treat');
   });
 });
