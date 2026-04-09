@@ -58,6 +58,7 @@ export class ReportsController {
       cronExpression: body.cronExpression,
       channels: body.channels,
       maxRunsPerDay: body.maxRunsPerDay,
+        exportFormat: body.exportFormat,
       actorUserId: (req as Request & { user?: { id?: string } }).user?.id,
     });
   }

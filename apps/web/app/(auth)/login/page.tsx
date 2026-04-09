@@ -21,6 +21,31 @@ function parseOrganizationIdFromToken(token?: string) {
   }
 }
 
+function parseRoleFromToken(token?: string) {
+  if (!token) return undefined;
+
+  try {
+    const segments = token.split('.');
+    if (segments.length < 2) return undefined;
+
+    const decoded = JSON.parse(atob(segments[1])) as Record<string, unknown>;
+    const role = decoded.role;
+    if (
+      role === 'OWNER' ||
+      role === 'ADMIN' ||
+      role === 'STAFF' ||
+      role === 'DELIVERY_MANAGER' ||
+      role === 'VIEWER'
+    ) {
+      return role;
+    }
+
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function normalizeRedirectPath(nextPath: string | null) {
   if (!nextPath || !nextPath.startsWith('/')) return '/dashboard';
   if (nextPath.startsWith('//')) return '/';
@@ -74,6 +99,7 @@ function LoginPageContent() {
         userId: response.user?.id ?? response.userId ?? `local-${email.trim().toLowerCase()}`,
         email: response.user?.email ?? response.email ?? email.trim().toLowerCase(),
         organizationId,
+        role: response.role ?? response.user?.role ?? parseRoleFromToken(token),
         accessToken: token,
       });
 

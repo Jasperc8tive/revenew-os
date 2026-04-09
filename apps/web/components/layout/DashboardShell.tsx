@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { CommandPalette } from '@/components/CommandPalette';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopNav } from '@/components/layout/TopNav';
 import { useAuth } from '@/hooks/useAuth';
 import { useCommandPaletteShortcut } from '@/hooks/useCommandPaletteShortcut';
+import { useRouteAccessGuard } from '@/hooks/useRouteAccessGuard';
 
 type DashboardShellProps = {
   children: React.ReactNode;
@@ -14,9 +15,11 @@ type DashboardShellProps = {
 
 export function DashboardShell({ children }: DashboardShellProps) {
   useCommandPaletteShortcut();
+  useRouteAccessGuard();
   const { isAuthenticated, isLoading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [isTransitioning, setIsTransitioning] = React.useState(false);
 
   useEffect(() => {
     if (isLoading || isAuthenticated) {
@@ -26,6 +29,12 @@ export function DashboardShell({ children }: DashboardShellProps) {
     const nextPath = pathname && pathname.startsWith('/') ? pathname : '/dashboard';
     router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
   }, [isAuthenticated, isLoading, pathname, router]);
+
+  useEffect(() => {
+    setIsTransitioning(true);
+    const timer = window.setTimeout(() => setIsTransitioning(false), 280);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
 
   if (isLoading) {
     return (
@@ -45,6 +54,11 @@ export function DashboardShell({ children }: DashboardShellProps) {
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
+      <div
+        className={`pointer-events-none fixed left-0 top-0 z-50 h-0.5 bg-cyan-500 transition-all duration-300 ${
+          isTransitioning ? 'w-full opacity-100' : 'w-0 opacity-0'
+        }`}
+      />
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopNav />

@@ -21,6 +21,7 @@ export function useAuth() {
     isLoading,
     isAuthenticated: Boolean(session),
     organizationId: session?.organizationId,
+    role: session?.role,
     logout,
   };
 }

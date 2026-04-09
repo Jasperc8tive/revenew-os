@@ -17,7 +17,7 @@ import { api, ExecutiveSummary } from '@/lib/api';
 import { formatNGN } from '@/utils/currency';
 
 function toTrend(value: number | undefined, invert = false) {
-	const normalized = Number.isFinite(value) ? value : 0;
+	const normalized = Number.isFinite(value ?? Number.NaN) ? (value ?? 0) : 0;
 	const direction = invert
 		? normalized <= 0
 			? 'up'

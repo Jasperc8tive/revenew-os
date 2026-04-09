@@ -1,7 +1,9 @@
-import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsNumber, IsOptional, IsString } from 'class-validator';
 
 const RISK_LEVELS = ['low', 'medium', 'high', 'critical'] as const;
 const ROLLOUT_STAGES = ['planned', 'canary', 'expanded', 'full', 'rolled_back'] as const;
+const TARGET_OPERATORS = ['gte', 'lte'] as const;
+const TARGET_CADENCE = ['daily', 'weekly', 'monthly'] as const;
 
 export class GovernanceOrgQueryDto {
   @IsString()
@@ -80,4 +82,21 @@ export class CreateReleaseRolloutDto {
   @IsOptional()
   @IsString()
   notes?: string;
+}
+
+export class UpsertSuccessMetricTargetDto {
+  @IsString()
+  organizationId!: string;
+
+  @IsString()
+  metricKey!: string;
+
+  @IsNumber()
+  targetValue!: number;
+
+  @IsIn(TARGET_OPERATORS)
+  operator!: (typeof TARGET_OPERATORS)[number];
+
+  @IsIn(TARGET_CADENCE)
+  cadence!: (typeof TARGET_CADENCE)[number];
 }

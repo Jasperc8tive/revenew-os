@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   TrendingUp,
 } from 'lucide-react';
+import { getAllowedRolesForPath, hasRoleAccess, type WorkspaceRole } from '@/lib/access-control';
 
 export interface NavItem {
   id: string;
@@ -21,6 +22,7 @@ export interface NavItem {
   icon: LucideIcon;
   description?: string;
   badge?: string | number;
+  roles?: WorkspaceRole[];
   children?: NavItem[];
 }
 
@@ -171,6 +173,7 @@ export const navigationConfig: NavSection[] = [
         href: '/dashboard/integrations',
         icon: Settings,
         description: 'Connected sources and syncs',
+        roles: getAllowedRolesForPath('/dashboard/integrations'),
       },
       {
         id: 'reports',
@@ -178,6 +181,7 @@ export const navigationConfig: NavSection[] = [
         href: '/dashboard/reports',
         icon: TrendingUp,
         description: 'Custom reports',
+        roles: getAllowedRolesForPath('/dashboard/reports'),
       },
       {
         id: 'billing',
@@ -185,6 +189,7 @@ export const navigationConfig: NavSection[] = [
         href: '/dashboard/billing',
         icon: Settings,
         description: 'Plans, invoices, and usage',
+        roles: getAllowedRolesForPath('/dashboard/billing'),
       },
     ],
   },
@@ -197,6 +202,7 @@ export const navigationConfig: NavSection[] = [
         href: '/dashboard/settings',
         icon: Settings,
         description: 'App configuration',
+        roles: getAllowedRolesForPath('/dashboard/settings'),
       },
       {
         id: 'help',
@@ -215,6 +221,23 @@ export const flattenNavItems = (sections: NavSection[]): NavItem[] => {
     ...section.items,
     ...(section.items.flatMap((item) => item.children || [])),
   ]);
+};
+
+export const filterNavigationByRole = (
+  sections: NavSection[],
+  role?: WorkspaceRole,
+): NavSection[] => {
+  return sections
+    .map((section) => ({
+      ...section,
+      items: section.items
+        .filter((item) => hasRoleAccess(item.roles, role))
+        .map((item) => ({
+          ...item,
+          children: item.children?.filter((child) => hasRoleAccess(child.roles, role)),
+        })),
+    }))
+    .filter((section) => section.items.length > 0);
 };
 
 // Get breadcrumb trail for a given path

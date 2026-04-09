@@ -7,10 +7,12 @@ import { Search, X } from 'lucide-react';
 import { useCommandPaletteStore } from '@/lib/store/commandPaletteStore';
 import { useDashboardStore } from '@/lib/store/dashboardStore';
 import { buildCommands, COMMAND_GROUPS } from '@/lib/commands';
+import { useAuth } from '@/hooks/useAuth';
 
 export function CommandPalette() {
+  const { role, organizationId } = useAuth();
   const { isOpen, close } = useCommandPaletteStore();
-  const { setDateRange } = useDashboardStore();
+  const { filters, setDateRange } = useDashboardStore();
   const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -36,8 +38,39 @@ export function CommandPalette() {
     close();
   }, [close]);
 
+  const exportDashboardCsv = useCallback(async () => {
+    if (!organizationId) {
+      close();
+      return;
+    }
+
+    const params = new URLSearchParams({
+      organizationId,
+      startDate: filters.dateRange.start.toISOString(),
+      endDate: filters.dateRange.end.toISOString(),
+    });
+
+    const response = await fetch(`/api/dashboard/export?${params.toString()}&format=pdf`);
+    if (!response.ok) {
+      close();
+      return;
+    }
+
+    const fileBlob = await response.blob();
+    const blob = new Blob([fileBlob], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dashboard-export-${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    close();
+  }, [organizationId, filters.dateRange.start, filters.dateRange.end, close]);
+
   // Build all commands, injecting date range setters
-  const allCommands = buildCommands({ navigate, toggleDarkMode, isDark, refreshDashboard }).map(
+  const allCommands = buildCommands({ navigate, toggleDarkMode, isDark, refreshDashboard, exportDashboardCsv, role }).map(
     (cmd) => {
       if (cmd.id === 'action-filter-7d') {
         return {

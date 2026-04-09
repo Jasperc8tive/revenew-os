@@ -199,3 +199,46 @@ Focus: deepen benchmarking, forecasting, experiments, competitive intelligence, 
 4. Optimization metrics
 - Higher experiment throughput and measurable impact realization.
 - Better benchmark actionability and forecast confidence.
+
+## Pending Plans (Post-Phase 4)
+
+The core four-phase backend roadmap is now implemented. The items below are still pending across the broader workspace plan and should be treated as post-Phase-4 execution tracks.
+
+### Progress Update (April 2026)
+- Success metrics operationalization has started in API governance endpoints with metrics snapshot and target threshold management.
+- Governance operations maturity has started with consolidated program-controls status reporting.
+- Continuous quality and observability has started with a dedicated API quality gate workflow and failure escalation notifier.
+- Dashboard productization/export has advanced with dashboard CSV/PDF export wiring and reports scheduling export-format linkage.
+- UX/navigation expansion has advanced with role-aware route filtering, quick-action command groups, and route transition polish.
+- Critical journey coverage has expanded with reports export and scheduled-delivery journey tests.
+
+### 1. UX and Navigation Expansion (Phase 5+)
+- Deliver command palette integration for fast navigation and actions.
+- Add route permission and auth guard behavior in web navigation surfaces.
+- Add advanced routing patterns and transition polish for dashboard workflows.
+
+### 2. Dashboard Productization and Export
+- Add production-grade export flows (CSV/PDF and scheduled export jobs).
+- Complete chart interaction depth (drill-down, zoom, legend state persistence).
+- Add real-time refresh strategy hardening (polling/WebSocket reliability and backoff).
+
+### 3. Governance Operations Maturity
+- Run weekly implementation reviews as an operational cadence with evidence capture.
+- Maintain and actively review risk register entries with owner accountability.
+- Enforce canary-first release controls for high-risk feature rollouts.
+
+### 4. Continuous Quality and Observability Program
+- Expand end-to-end critical journey test coverage beyond module-level specs.
+- Keep CI gates strict with analytics audits and stable in-band test runs.
+- Operationalize alerting and escalation for production gate failures.
+
+### 5. Success Metrics Operationalization
+- Build recurring reporting for stability, intelligence, workflow, and optimization metrics.
+- Set target thresholds and review cadence for adoption, SLA, and confidence outcomes.
+- Tie release progression decisions to measured success metrics rather than implementation completeness alone.
+
+## Recommended Next Execution Order
+1. Success metrics operationalization and governance cadence.
+2. Continuous quality and observability program hardening.
+3. Dashboard productization and export depth.
+4. UX and navigation expansion (command palette and route security polish).

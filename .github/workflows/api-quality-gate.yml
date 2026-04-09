@@ -1,0 +1,93 @@
+name: API Quality Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/api/**'
+      - 'packages/analytics/**'
+      - 'packages/database/**'
+      - '.github/workflows/api-quality-gate.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/api/**'
+      - 'packages/analytics/**'
+      - 'packages/database/**'
+      - '.github/workflows/api-quality-gate.yml'
+  workflow_dispatch:
+
+env:
+  DATABASE_URL: postgresql://revenew_user:dev_password@127.0.0.1:5432/revenew_os
+  DATABASE_SHADOW_URL: postgresql://revenew_user:dev_password@127.0.0.1:5432/revenew_os_shadow
+  JWT_SECRET: ci-test-secret
+  REDIS_HOST: 127.0.0.1
+  REDIS_PORT: 6379
+  REDIS_URL: redis://127.0.0.1:6379
+
+jobs:
+  api-quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: revenew_user
+          POSTGRES_PASSWORD: dev_password
+          POSTGRES_DB: revenew_os
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U revenew_user -d revenew_os"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create shadow database
+        run: |
+          PGPASSWORD=dev_password psql -h 127.0.0.1 -U revenew_user -d postgres -c "CREATE DATABASE revenew_os_shadow;" || true
+        env:
+          PGPASSWORD: dev_password
+
+      - name: Generate Prisma client
+        run: npm run db:generate --workspace packages/database
+
+      - name: Apply Prisma migrations
+        run: npm run db:migrate:deploy --workspace packages/database
+
+      - name: Run API quality gate
+        run: npm run quality:ci:gate --workspace apps/api
+
+      - name: Notify on production quality gate failure
+        if: failure() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+        run: npm run qa:api:gate:notify

@@ -6,6 +6,7 @@ import {
   CreateReleaseRolloutDto,
   CreateRiskDto,
   GovernanceOrgQueryDto,
+  UpsertSuccessMetricTargetDto,
   UpsertWeeklyReviewDto,
 } from './dto/governance.dto';
 import { GovernanceService } from './governance.service';
@@ -79,5 +80,32 @@ export class GovernanceController {
       notes: body.notes,
       actorUserId: this.getActorUserId(req),
     });
+  }
+
+  @Get('success-metrics')
+  successMetrics(@Req() req: Request, @Query() query: GovernanceOrgQueryDto) {
+    return this.governanceService.getSuccessMetrics(query.organizationId, this.getActorUserId(req));
+  }
+
+  @Get('success-metrics/targets')
+  successMetricTargets(@Req() req: Request, @Query() query: GovernanceOrgQueryDto) {
+    return this.governanceService.listSuccessMetricTargets(query.organizationId, this.getActorUserId(req));
+  }
+
+  @Post('success-metrics/targets')
+  upsertSuccessMetricTarget(@Req() req: Request, @Body() body: UpsertSuccessMetricTargetDto) {
+    return this.governanceService.upsertSuccessMetricTarget({
+      organizationId: body.organizationId,
+      metricKey: body.metricKey,
+      targetValue: body.targetValue,
+      operator: body.operator,
+      cadence: body.cadence,
+      actorUserId: this.getActorUserId(req),
+    });
+  }
+
+  @Get('program-controls/status')
+  programControlsStatus(@Req() req: Request, @Query() query: GovernanceOrgQueryDto) {
+    return this.governanceService.getProgramControlsStatus(query.organizationId, this.getActorUserId(req));
   }
 }

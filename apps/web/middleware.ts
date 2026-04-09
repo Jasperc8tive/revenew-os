@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { AUTH_COOKIE_KEY } from '@/lib/auth-constants';
+import { getAllowedRolesForPath, isWorkspaceRole, type WorkspaceRole } from '@/lib/access-control';
 
 const LEGACY_DASHBOARD_REDIRECTS: Record<string, string> = {
   '/analytics': '/dashboard/analytics',
@@ -31,9 +32,23 @@ function isProtectedRoute(pathname: string) {
   return pathname === '/dashboard' || pathname.startsWith('/dashboard/');
 }
 
+function readRoleFromSessionCookie(cookieValue?: string): WorkspaceRole | undefined {
+  if (!cookieValue) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(atob(decodeURIComponent(cookieValue))) as { role?: unknown };
+    return isWorkspaceRole(parsed.role) ? parsed.role : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const hasSession = Boolean(request.cookies.get(AUTH_COOKIE_KEY)?.value);
+  const sessionCookieValue = request.cookies.get(AUTH_COOKIE_KEY)?.value;
+  const hasSession = Boolean(sessionCookieValue);
 
   if (pathname === '/dashboard/dashboard' || pathname.startsWith('/dashboard/dashboard/')) {
     const normalizedPath = pathname.replace('/dashboard/dashboard', '/dashboard');
@@ -67,6 +82,26 @@ export function middleware(request: NextRequest) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('next', `${pathname}${search}`);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (hasSession && isProtectedRoute(pathname)) {
+    const allowedRoles = getAllowedRolesForPath(pathname);
+
+    if (allowedRoles) {
+      const role = readRoleFromSessionCookie(sessionCookieValue);
+
+      if (!role) {
+        const loginUrl = new URL('/login', request.url);
+        loginUrl.searchParams.set('next', `${pathname}${search}`);
+        return NextResponse.redirect(loginUrl);
+      }
+
+      if (!allowedRoles.includes(role)) {
+        const unauthorizedUrl = new URL('/dashboard/unauthorized', request.url);
+        unauthorizedUrl.searchParams.set('from', `${pathname}${search}`);
+        return NextResponse.redirect(unauthorizedUrl);
+      }
+    }
   }
 
   if (hasSession && isAuthRoute(pathname)) {

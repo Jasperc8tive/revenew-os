@@ -28,8 +28,8 @@ describe('ReportsController (e2e)', () => {
 
     reportsServiceMock.listRuns.mockImplementation(async () => [{ id: 'run-1', template: 'executive_summary' }]);
     reportsServiceMock.generateReport.mockImplementation(async () => ({ id: 'run-2', status: 'COMPLETED' }));
-    reportsServiceMock.exportRun.mockImplementation(async () => ({ runId: 'run-1', format: 'json', content: '{}' }));
-    reportsServiceMock.createSchedule.mockImplementation(async () => [{ id: 'schedule-1', template: 'executive_summary' }]);
+    reportsServiceMock.exportRun.mockImplementation(async () => ({ runId: 'run-1', format: 'pdf', content: 'JVBERi0xLjQ=', contentType: 'application/pdf', encoding: 'base64' }));
+    reportsServiceMock.createSchedule.mockImplementation(async () => [{ id: 'schedule-1', template: 'executive_summary', exportFormat: 'pdf' }]);
     reportsServiceMock.listSchedules.mockImplementation(async () => [{ id: 'schedule-1' }]);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -68,10 +68,10 @@ describe('ReportsController (e2e)', () => {
 
   it('GET /reports/runs/:id/export returns export payload', async () => {
     const response = await request(app.getHttpServer())
-      .get('/reports/runs/run-1/export?organizationId=org-1&format=json')
+      .get('/reports/runs/run-1/export?organizationId=org-1&format=pdf')
       .expect(200);
 
-    expect(response.body.format).toBe('json');
+    expect(response.body.format).toBe('pdf');
     expect(reportsServiceMock.exportRun).toHaveBeenCalledWith(
       expect.objectContaining({ actorUserId: 'system-user' }),
     );
@@ -86,10 +86,12 @@ describe('ReportsController (e2e)', () => {
         cronExpression: 'DAILY',
         channels: ['email'],
         maxRunsPerDay: 1,
+        exportFormat: 'pdf',
       })
       .expect(201);
 
     expect(response.body[0].id).toBe('schedule-1');
+    expect(response.body[0].exportFormat).toBe('pdf');
     expect(reportsServiceMock.createSchedule).toHaveBeenCalledWith(
       expect.objectContaining({ actorUserId: 'system-user' }),
     );

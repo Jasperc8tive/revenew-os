@@ -23,6 +23,7 @@
     "qa:ui:crawl:ci:production": "node scripts/run_ui_crawl_profile.mjs production",
     "qa:ui:gate:comment": "node scripts/post-qa-gate-comment.mjs",
     "qa:ui:gate:notify": "node scripts/notify-qa-gate-failure.mjs",
+    "qa:api:gate:notify": "node scripts/notify-api-gate-failure.mjs",
     "db:migrate": "turbo run db:migrate",
     "db:seed": "turbo run db:seed",
     "docker:up": "docker-compose up -d",

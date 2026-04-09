@@ -30,6 +30,7 @@ type ReportScheduleRow = {
   cron_expression: string;
   channels: unknown;
   max_runs_per_day: number;
+  export_format: 'json' | 'csv' | 'pdf';
   last_triggered_at: Date | null;
   active: boolean;
   created_by: string | null;
@@ -135,7 +136,7 @@ export class ReportsService {
   async exportRun(input: {
     organizationId: string;
     runId: string;
-    format: 'json' | 'csv';
+    format: 'json' | 'csv' | 'pdf';
     actorUserId?: string;
   }) {
     await this.assertReportAccess(input.organizationId, input.actorUserId, false);
@@ -148,6 +149,18 @@ export class ReportsService {
         runId: run.id,
         format: 'json',
         content: JSON.stringify(payload ?? {}, null, 2),
+        contentType: 'application/json',
+      };
+    }
+
+    if (input.format === 'pdf') {
+      const pdf = this.buildSimplePdf(payload ?? {});
+      return {
+        runId: run.id,
+        format: 'pdf',
+        content: pdf.toString('base64'),
+        contentType: 'application/pdf',
+        encoding: 'base64',
       };
     }
 
@@ -155,6 +168,7 @@ export class ReportsService {
       runId: run.id,
       format: 'csv',
       content: this.flattenToCsv(payload ?? {}),
+      contentType: 'text/csv',
     };
   }
 
@@ -164,6 +178,7 @@ export class ReportsService {
     cronExpression: string;
     channels: string[];
     maxRunsPerDay: number;
+    exportFormat?: 'json' | 'csv' | 'pdf';
     actorUserId?: string;
   }) {
     await this.assertReportAccess(input.organizationId, input.actorUserId, true);
@@ -181,9 +196,10 @@ export class ReportsService {
         cron_expression,
         channels,
         max_runs_per_day,
+        export_format,
         created_by
       )
-      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)
       `,
       scheduleId,
       input.organizationId,
@@ -191,6 +207,7 @@ export class ReportsService {
       input.cronExpression,
       JSON.stringify(input.channels.map((item) => item.trim().toLowerCase()).filter(Boolean)),
       input.maxRunsPerDay,
+      input.exportFormat ?? 'csv',
       input.actorUserId ?? null,
     );
 
@@ -212,6 +229,7 @@ export class ReportsService {
         cron_expression,
         channels,
         max_runs_per_day,
+        export_format,
         last_triggered_at,
         active,
         created_by,
@@ -230,6 +248,7 @@ export class ReportsService {
       cronExpression: row.cron_expression,
       channels: this.normalizeStringArray(row.channels),
       maxRunsPerDay: row.max_runs_per_day,
+      exportFormat: row.export_format,
       lastTriggeredAt: row.last_triggered_at,
       active: row.active,
       createdBy: row.created_by,
@@ -249,6 +268,7 @@ export class ReportsService {
         cron_expression,
         channels,
         max_runs_per_day,
+        export_format,
         last_triggered_at,
         active,
         created_by,
@@ -307,7 +327,7 @@ export class ReportsService {
         await this.notificationsService.dispatchAlert({
           organizationId: schedule.organization_id,
           title: `Scheduled report: ${schedule.template}`,
-          message: `Report run ${run.id} completed and is ready for export.`,
+          message: `Report run ${run.id} completed and is ready for ${schedule.export_format.toUpperCase()} export at /reports/runs/${run.id}/export?organizationId=${schedule.organization_id}&format=${schedule.export_format}.`,
           channels,
         });
       }
@@ -460,6 +480,39 @@ export class ReportsService {
     return `"${escaped}"`;
   }
 
+  private buildSimplePdf(payload: Record<string, unknown>) {
+    const csvRows = this.flattenToCsv(payload).split('\n').slice(0, 35);
+    const lines = ['Revenew Report Export', ...csvRows];
+    const sanitized = lines
+      .map((line) => line.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)'))
+      .map((line) => `(${line}) Tj`)
+      .join(' T* ');
+
+    const stream = `BT /F1 10 Tf 50 780 Td ${sanitized} ET`;
+    const pdfObjects = [
+      '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+      '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+      '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj',
+      '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+      `5 0 obj << /Length ${stream.length} >> stream\n${stream}\nendstream endobj`,
+    ];
+
+    let body = '';
+    const offsets: number[] = [];
+    for (const object of pdfObjects) {
+      offsets.push(body.length);
+      body += `${object}\n`;
+    }
+
+    const xrefStart = `%PDF-1.4\n${body}`.length;
+    const xrefEntries = ['0000000000 65535 f ']
+      .concat(offsets.map((offset) => `${String(offset + 9).padStart(10, '0')} 00000 n `))
+      .join('\n');
+
+    const trailer = `xref\n0 ${pdfObjects.length + 1}\n${xrefEntries}\ntrailer << /Size ${pdfObjects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+    return Buffer.from(`%PDF-1.4\n${body}${trailer}`, 'utf-8');
+  }
+
   private normalizeStringArray(value: unknown): string[] {
     if (!Array.isArray(value)) {
       return [];
@@ -520,11 +573,17 @@ export class ReportsService {
         cron_expression TEXT NOT NULL,
         channels JSONB NOT NULL,
         max_runs_per_day INT NOT NULL,
+        export_format TEXT NOT NULL DEFAULT 'csv',
         last_triggered_at TIMESTAMPTZ,
         active BOOLEAN NOT NULL DEFAULT true,
         created_by TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+
+    await this.prisma.$executeRawUnsafe(`
+      ALTER TABLE report_schedules
+      ADD COLUMN IF NOT EXISTS export_format TEXT NOT NULL DEFAULT 'csv'
     `);
   }
 
