@@ -1456,7 +1456,7 @@ async function verifyServicesReady() {
   await waitForTcp('127.0.0.1', 6379, 120000);
   await waitForHttp(API_URL, 120000);
   await waitForHttp(`${AGENTS_URL}/health`, 120000);
-  await waitForHttp(`${WEB_URL}/login?next=%2Fdashboard`, 120000);
+  await waitForHttp(WEB_URL, 120000);
 }
 
 async function main() {
