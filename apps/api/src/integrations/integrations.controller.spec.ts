@@ -170,6 +170,7 @@ describe('IntegrationsController (e2e)', () => {
       id: 'integration-1',
       organizationId: 'org-1',
       provider: IntegrationProvider.GOOGLE_ADS,
+      status: IntegrationStatus.ACTIVE,
     }));
     queueMock.add.mockImplementation(async () => ({ id: 'job-1' }));
 

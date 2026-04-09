@@ -140,6 +140,7 @@ export class AnalyticsService {
     const ltvToCacRatio = verifiedCac === 0 ? 0 : verifiedLtv / verifiedCac;
 
     const anomalyScan = await this.dataQualityService.scanAndStoreAnomalies(input.organizationId, 30);
+    const dataQualitySummary = await this.dataQualityService.getSummary(input.organizationId);
     const confidence = await this.confidenceScoringService.score({
       organizationId: input.organizationId,
       dataPoints: verifiedDataPoints,
@@ -318,6 +319,14 @@ export class AnalyticsService {
       suppression,
       evidenceCards,
       verifiedMetrics,
+      dataQuality: {
+        summary: dataQualitySummary,
+        recentAnomalies: anomalyScan.anomalies,
+        status:
+          dataQualitySummary.totals.anomalyEvents > 0 || dataQualitySummary.totals.validationEvents > 0
+            ? 'attention'
+            : 'healthy',
+      },
     };
   }
 

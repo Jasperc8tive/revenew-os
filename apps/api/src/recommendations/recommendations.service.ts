@@ -33,6 +33,88 @@ export const DEFAULT_RECOMMENDATION_GUARDRAILS: RecommendationGuardrailPolicy = 
 export class RecommendationsService {
   constructor(private readonly prisma: PrismaService) {}
 
+	async listRecommendations(input: {
+		organizationId: string;
+		status?: RecommendationStatus;
+		limit?: number;
+	}) {
+		const limit = Math.min(Math.max(input.limit ?? 50, 1), 200);
+
+		return this.prisma.recommendation.findMany({
+			where: {
+				organizationId: input.organizationId,
+				...(input.status ? { status: input.status } : {}),
+			},
+			include: {
+				insight: {
+					select: {
+						id: true,
+						insight: true,
+						impactLevel: true,
+						confidenceScore: true,
+						createdAt: true,
+					},
+				},
+			},
+			orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+			take: limit,
+		});
+	}
+
+	async transitionRecommendationStatus(input: {
+		recommendationId: string;
+		organizationId: string;
+		status: RecommendationStatus;
+		impactSummary?: string;
+	}) {
+		const recommendation = await this.prisma.recommendation.findFirst({
+			where: {
+				id: input.recommendationId,
+				organizationId: input.organizationId,
+			},
+			select: {
+				id: true,
+				assumptions: true,
+			},
+		});
+
+		if (!recommendation) {
+			return null;
+		}
+
+		const existingAssumptions =
+			recommendation.assumptions &&
+			typeof recommendation.assumptions === 'object' &&
+			!Array.isArray(recommendation.assumptions)
+				? (recommendation.assumptions as Record<string, unknown>)
+				: {};
+
+		const currentHistory = Array.isArray(existingAssumptions.statusHistory)
+			? existingAssumptions.statusHistory
+			: [];
+
+		const statusHistory = [
+			...currentHistory,
+			{
+				status: input.status,
+				updatedAt: new Date().toISOString(),
+				impactSummary: input.impactSummary ?? null,
+			},
+		];
+
+		return this.prisma.recommendation.update({
+			where: { id: input.recommendationId },
+			data: {
+				status: input.status,
+				assumptions: {
+					...existingAssumptions,
+					statusHistory,
+					latestImpactSummary: input.impactSummary ?? existingAssumptions.latestImpactSummary ?? null,
+				} as Prisma.InputJsonValue,
+			},
+		});
+	}
+
 	evaluateGuardrails(
 		input: RecommendationGenerationInput,
 		policy: RecommendationGuardrailPolicy = DEFAULT_RECOMMENDATION_GUARDRAILS,
@@ -76,16 +158,18 @@ export class RecommendationsService {
 		suppressionReason?: string;
 		traceId: string;
 	}) {
+		const dedupeTrace = input.traceId || [input.organizationId, input.recommendation, input.dataWindow.startDate, input.dataWindow.endDate].join(':');
+
 		const existing = await this.prisma.recommendation.findFirst({
 			where: {
 				organizationId: input.organizationId,
-				traceId: input.traceId,
+				traceId: dedupeTrace,
 			},
 			select: { id: true },
 		});
 
 		if (existing) {
-			return { persisted: false, recommendationId: existing.id, traceId: input.traceId };
+			return { persisted: false, recommendationId: existing.id, traceId: dedupeTrace };
 		}
 
 		const execution = await this.prisma.agentExecutionLog.create({
@@ -112,7 +196,7 @@ export class RecommendationsService {
 					explanationWhy: input.explanation.why,
 					explanationAction: input.explanation.action,
 					suppressionReason: input.suppressionReason,
-					traceId: input.traceId,
+					traceId: dedupeTrace,
 				},
 			});
 
@@ -130,7 +214,7 @@ export class RecommendationsService {
 						suppressionReason: input.suppressionReason ?? null,
 					} as Prisma.InputJsonValue,
 					priority: input.impactLevel === ImpactLevel.CRITICAL ? 1 : input.impactLevel === ImpactLevel.HIGH ? 2 : input.impactLevel === ImpactLevel.MEDIUM ? 3 : 4,
-					traceId: input.traceId,
+					traceId: dedupeTrace,
 					status: RecommendationStatus.PENDING,
 				},
 			});
@@ -143,7 +227,7 @@ export class RecommendationsService {
 				},
 			});
 
-			return { persisted: true, recommendationId: recommendation.id, traceId: input.traceId };
+			return { persisted: true, recommendationId: recommendation.id, traceId: dedupeTrace };
 		} catch (error) {
 			await this.prisma.agentExecutionLog.update({
 				where: { id: execution.id },

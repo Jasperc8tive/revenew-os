@@ -17,6 +17,7 @@ import { AuthModule } from './auth/auth.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { DataQualityModule } from './data-quality/data-quality.module';
 import { OperationsModule } from './operations/operations.module';
+import { AgentsModule } from './agents/agents.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { OperationsModule } from './operations/operations.module';
     RecommendationsModule,
     DataQualityModule,
     OperationsModule,
+    AgentsModule,
   ],
   controllers: [],
   providers: [],

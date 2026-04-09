@@ -93,8 +93,27 @@ export class CopilotService {
       organizationId: input.organizationId,
     });
 
+    const recentRecommendations = await this.prisma.recommendation.findMany({
+      where: {
+        organizationId: input.organizationId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 3,
+      select: {
+        id: true,
+        recommendation: true,
+        status: true,
+        priority: true,
+        confidenceScore: true,
+        traceId: true,
+      },
+    });
+
     const contextSnapshot = {
       executiveSummary,
+      recentRecommendations,
       generatedAt: new Date().toISOString(),
     } as unknown as Prisma.InputJsonValue;
 
@@ -118,11 +137,15 @@ export class CopilotService {
       {
         role: 'system',
         content:
-          'You are Revenew Growth Copilot. Give practical, execution-ready growth advice based on provided analytics.',
+          'You are Revenew Growth Copilot. Respond with reliable, actionable guidance using this structure: Situation, Risks, Action Plan (3-5 numbered actions), Evidence (metric/recommendation references), and Fallback if confidence is low.',
       },
       {
         role: 'system',
         content: `Executive summary context: ${JSON.stringify(executiveSummary)}`,
+      },
+      {
+        role: 'system',
+        content: `Recent recommendations context: ${JSON.stringify(recentRecommendations)}`,
       },
       ...conversation.messages.map((message) => ({
         role: (message.role === CopilotRole.USER ? 'user' : 'assistant') as 'user' | 'assistant',
@@ -134,7 +157,26 @@ export class CopilotService {
       },
     ];
 
-    const assistantContent = await adapter.generate({ messages: llmMessages });
+    let assistantContent: string;
+    try {
+      assistantContent = await adapter.generate({ messages: llmMessages });
+    } catch (error) {
+      assistantContent = [
+        'Situation: AI provider request failed, so fallback guidance is returned.',
+        'Risks: Response may be less contextual than normal model output.',
+        'Action Plan:\n1. Verify COPILOT_PROVIDER and API credentials.\n2. Re-run this request after provider health check.\n3. Execute top recommendation from the latest executive summary.',
+        `Evidence: Top recommendation: ${executiveSummary.topRecommendation}`,
+        `Fallback: ${error instanceof Error ? error.message : 'Unknown provider error'}`,
+      ].join('\n\n');
+    }
+
+    if (!assistantContent.includes('Action Plan')) {
+      assistantContent = [
+        'Situation: Request processed with available context.',
+        assistantContent,
+        'Action Plan:\n1. Prioritize the highest-impact recommendation.\n2. Validate against current confidence score.\n3. Track outcome in recommendation status updates.',
+      ].join('\n\n');
+    }
 
     const assistantMessage = await this.prisma.copilotMessage.create({
       data: {

@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, VerifiedMetricWindow } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 
+const VERIFIED_METRICS_CONTRACT_VERSION = 'v1';
+
 export interface VerifiedMetricSnapshotInput {
   organizationId: string;
   metricKey: 'cac' | 'ltv' | 'revenue' | 'churn';
@@ -19,6 +21,17 @@ export interface VerifiedMetricSnapshotInput {
 @Injectable()
 export class VerifiedMetricsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private getFreshness(verifiedAt: Date) {
+    const ageMs = Date.now() - verifiedAt.getTime();
+    const ageHours = Math.max(0, ageMs / (1000 * 60 * 60));
+    const status = ageHours <= 24 ? 'fresh' : ageHours <= 72 ? 'stale' : 'expired';
+
+    return {
+      ageHours: Number(ageHours.toFixed(2)),
+      status,
+    } as const;
+  }
 
   async upsertSnapshots(inputs: VerifiedMetricSnapshotInput[]) {
     const snapshots = await Promise.all(
@@ -59,20 +72,34 @@ export class VerifiedMetricsService {
       ),
     );
 
-    return snapshots.map((snapshot) => ({
-      id: snapshot.id,
-      metricKey: snapshot.metricKey,
-      windowType: snapshot.windowType,
-      windowStart: snapshot.windowStart.toISOString(),
-      windowEnd: snapshot.windowEnd.toISOString(),
-      metricValue: Number(snapshot.metricValue),
-      formulaVersion: snapshot.formulaVersion,
-      sourceTables: Array.isArray(snapshot.sourceTables) ? snapshot.sourceTables : [],
-      sampleSize: snapshot.sampleSize,
-      dataQualityFlags: Array.isArray(snapshot.dataQualityFlags) ? snapshot.dataQualityFlags : [],
-      inputs: snapshot.inputs,
-      verifiedAt: snapshot.verifiedAt.toISOString(),
-    }));
+    return snapshots.map((snapshot) => {
+      const freshness = this.getFreshness(snapshot.verifiedAt);
+
+      return {
+        id: snapshot.id,
+        metricKey: snapshot.metricKey,
+        windowType: snapshot.windowType,
+        windowStart: snapshot.windowStart.toISOString(),
+        windowEnd: snapshot.windowEnd.toISOString(),
+        metricValue: Number(snapshot.metricValue),
+        formulaVersion: snapshot.formulaVersion,
+        sourceTables: Array.isArray(snapshot.sourceTables) ? snapshot.sourceTables : [],
+        sampleSize: snapshot.sampleSize,
+        dataQualityFlags: Array.isArray(snapshot.dataQualityFlags) ? snapshot.dataQualityFlags : [],
+        inputs: snapshot.inputs,
+        verifiedAt: snapshot.verifiedAt.toISOString(),
+        contract: {
+          version: VERIFIED_METRICS_CONTRACT_VERSION,
+          freshness,
+          confidenceBand:
+            snapshot.sampleSize >= 100
+              ? 'high'
+              : snapshot.sampleSize >= 25
+                ? 'medium'
+                : 'low',
+        },
+      };
+    });
   }
 
   async listSnapshots(input: {
@@ -99,19 +126,33 @@ export class VerifiedMetricsService {
       orderBy: [{ windowEnd: 'desc' }, { metricKey: 'asc' }],
     });
 
-    return snapshots.map((snapshot) => ({
-      id: snapshot.id,
-      metricKey: snapshot.metricKey,
-      windowType: snapshot.windowType,
-      windowStart: snapshot.windowStart.toISOString(),
-      windowEnd: snapshot.windowEnd.toISOString(),
-      metricValue: Number(snapshot.metricValue),
-      formulaVersion: snapshot.formulaVersion,
-      sourceTables: Array.isArray(snapshot.sourceTables) ? snapshot.sourceTables : [],
-      sampleSize: snapshot.sampleSize,
-      dataQualityFlags: Array.isArray(snapshot.dataQualityFlags) ? snapshot.dataQualityFlags : [],
-      inputs: snapshot.inputs,
-      verifiedAt: snapshot.verifiedAt.toISOString(),
-    }));
+    return snapshots.map((snapshot) => {
+      const freshness = this.getFreshness(snapshot.verifiedAt);
+
+      return {
+        id: snapshot.id,
+        metricKey: snapshot.metricKey,
+        windowType: snapshot.windowType,
+        windowStart: snapshot.windowStart.toISOString(),
+        windowEnd: snapshot.windowEnd.toISOString(),
+        metricValue: Number(snapshot.metricValue),
+        formulaVersion: snapshot.formulaVersion,
+        sourceTables: Array.isArray(snapshot.sourceTables) ? snapshot.sourceTables : [],
+        sampleSize: snapshot.sampleSize,
+        dataQualityFlags: Array.isArray(snapshot.dataQualityFlags) ? snapshot.dataQualityFlags : [],
+        inputs: snapshot.inputs,
+        verifiedAt: snapshot.verifiedAt.toISOString(),
+        contract: {
+          version: VERIFIED_METRICS_CONTRACT_VERSION,
+          freshness,
+          confidenceBand:
+            snapshot.sampleSize >= 100
+              ? 'high'
+              : snapshot.sampleSize >= 25
+                ? 'medium'
+                : 'low',
+        },
+      };
+    });
   }
 }
