@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DollarSign, Target, TrendingUp, Users, RefreshCw } from 'lucide-react';
 import { DateRangePicker } from '@/components/dashboard/DateRangePicker';
 import { DashboardCustomizer } from '@/components/dashboard/DashboardCustomizer';
@@ -36,28 +36,105 @@ function toTrend(value: number | undefined, invert = false) {
 export default function DashboardHomePage() {
 	const [loading, setLoading] = useState(true);
 	const [summary, setSummary] = useState<ExecutiveSummary | null>(null);
-	const { preferences, isLoading } = useDashboardStore();
+	const [autoRefreshState, setAutoRefreshState] = useState<{
+		status: 'syncing' | 'live' | 'degraded';
+		consecutiveFailures: number;
+		lastSuccessfulSync: Date | null;
+	}>({ status: 'syncing', consecutiveFailures: 0, lastSuccessfulSync: null });
+	const failureCountRef = useRef(0);
+	const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const {
+		preferences,
+		interactions,
+		setSelectedChannel,
+		setRevenueZoom,
+		toggleChartSeriesVisibility,
+	} = useDashboardStore();
 	const { organizationId } = useAuth();
 
+	const fetchSummary = useCallback(
+		async (silent = false) => {
+			if (!organizationId) {
+				return false;
+			}
+
+			if (!silent) {
+				setLoading(true);
+			}
+
+			setAutoRefreshState((state) => ({ ...state, status: 'syncing' }));
+
+			try {
+				const result = await api.analytics.getExecutiveSummary(organizationId);
+				setSummary(result);
+				failureCountRef.current = 0;
+				setAutoRefreshState({
+					status: 'live',
+					consecutiveFailures: 0,
+					lastSuccessfulSync: new Date(),
+				});
+				return true;
+			} catch {
+				failureCountRef.current = Math.min(failureCountRef.current + 1, 5);
+				setAutoRefreshState((state) => ({
+					status: 'degraded',
+					consecutiveFailures: failureCountRef.current,
+					lastSuccessfulSync: state.lastSuccessfulSync,
+				}));
+				return false;
+			} finally {
+				if (!silent) {
+					setLoading(false);
+				}
+			}
+		},
+		[organizationId],
+	);
+
 	useEffect(() => {
-		const timer = setTimeout(() => setLoading(false), 800);
-		return () => clearTimeout(timer);
-	}, []);
+		if (!organizationId) {
+			setLoading(false);
+			return;
+		}
+
+		void fetchSummary(false);
+	}, [organizationId, fetchSummary]);
 
 	useEffect(() => {
 		if (!organizationId) {
 			return;
 		}
 
-		void (async () => {
-			try {
-				const result = await api.analytics.getExecutiveSummary(organizationId);
-				setSummary(result);
-			} catch {
-				setSummary(null);
+		let isCancelled = false;
+
+		const scheduleNext = () => {
+			if (isCancelled) {
+				return;
 			}
-		})();
-	}, [organizationId]);
+
+			const backoffMultiplier = Math.pow(2, Math.min(failureCountRef.current, 3));
+			const nextDelay = Math.min(preferences.refreshInterval * backoffMultiplier, 5 * 60 * 1000);
+
+			refreshTimerRef.current = setTimeout(async () => {
+				if (isCancelled) {
+					return;
+				}
+
+				await fetchSummary(true);
+				scheduleNext();
+			}, nextDelay);
+		};
+
+		scheduleNext();
+
+		return () => {
+			isCancelled = true;
+			if (refreshTimerRef.current) {
+				clearTimeout(refreshTimerRef.current);
+				refreshTimerRef.current = null;
+			}
+		};
+	}, [organizationId, preferences.refreshInterval, fetchSummary]);
 
 	const liveMetrics = useMemo(() => {
 		if (!summary) {
@@ -136,6 +213,9 @@ export default function DashboardHomePage() {
 		}));
 	}, [summary]);
 
+	const selectedChannel = interactions.selectedChannel;
+	const hasSelectedChannel = Boolean(selectedChannel);
+
 	const pipelineChartData = useMemo(() => {
 		if (!summary) {
 			return [] as Array<{ stage: string; count: number }>;
@@ -146,6 +226,54 @@ export default function DashboardHomePage() {
 			count: channel.newCustomers,
 		}));
 	}, [summary]);
+
+	const filteredChannelChartData = useMemo(() => {
+		if (!selectedChannel) {
+			return channelChartData;
+		}
+
+		return channelChartData.filter((item) => item.period === selectedChannel);
+	}, [channelChartData, selectedChannel]);
+
+	const filteredPipelineChartData = useMemo(() => {
+		if (!selectedChannel) {
+			return pipelineChartData;
+		}
+
+		return pipelineChartData.filter((item) => item.stage === selectedChannel);
+	}, [pipelineChartData, selectedChannel]);
+
+	const handleChannelDrillDown = useCallback(
+		(payload: Record<string, unknown>) => {
+			const channel = payload.period ?? payload.stage;
+			if (typeof channel !== 'string' || channel.length === 0) {
+				return;
+			}
+
+			setSelectedChannel(selectedChannel === channel ? null : channel);
+		},
+		[selectedChannel, setSelectedChannel],
+	);
+
+	const refreshStateLabel = useMemo(() => {
+		if (autoRefreshState.status === 'degraded') {
+			return `Auto-refresh degraded (retry x${autoRefreshState.consecutiveFailures})`;
+		}
+
+		if (autoRefreshState.status === 'syncing') {
+			return 'Syncing latest data...';
+		}
+
+		if (!autoRefreshState.lastSuccessfulSync) {
+			return 'Live refresh enabled';
+		}
+
+		return `Live refresh every ${Math.round(preferences.refreshInterval / 1000)}s`;
+	}, [autoRefreshState, preferences.refreshInterval]);
+
+	const handleManualRefresh = useCallback(() => {
+		void fetchSummary(false);
+	}, [fetchSummary]);
 
 	const visibleMetrics = [
 		{
@@ -205,7 +333,7 @@ export default function DashboardHomePage() {
 				]}
 				action={
 					<button
-						onClick={() => window.location.reload()}
+						onClick={handleManualRefresh}
 						className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
 						title="Refresh data"
 					>
@@ -220,6 +348,10 @@ export default function DashboardHomePage() {
 				<DashboardCustomizer />
 			</div>
 
+			<div className="text-xs text-slate-600 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 inline-flex items-center">
+				{refreshStateLabel}
+			</div>
+
 			<div className={`grid grid-cols-1 md:grid-cols-2 ${preferences.chartsPerRow === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
 				{visibleMetrics.map((metric) => (
 					<MetricCard
@@ -228,7 +360,7 @@ export default function DashboardHomePage() {
 						value={metric.value.value}
 						trend={metric.value.trend}
 						icon={metric.icon}
-						loading={loading || isLoading}
+						loading={loading}
 					/>
 				))}
 			</div>
@@ -238,11 +370,28 @@ export default function DashboardHomePage() {
 					{loading ? (
 						<SkeletonChart />
 					) : (
-						<ChartContainer title="Revenue Trend" description="Last 30 days of revenue data">
+						<ChartContainer
+							title="Revenue Trend"
+							description="Last 30 days of revenue data with zoom and point drill-down"
+							action={
+								interactions.revenueZoom ? (
+									<button
+										onClick={() => setRevenueZoom(null)}
+										className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200"
+									>
+										Reset zoom
+									</button>
+								) : null
+							}
+						>
 							<LineChart
 								data={revenueChartData}
 								dataKey="revenue"
 								stroke="#4f46e5"
+								xAxisKey="date"
+								zoomRange={interactions.revenueZoom}
+								onZoomChange={setRevenueZoom}
+								onPointClick={handleChannelDrillDown}
 								height={300}
 							/>
 						</ChartContainer>
@@ -253,13 +402,29 @@ export default function DashboardHomePage() {
 					{loading ? (
 						<SkeletonChart />
 					) : (
-						<ChartContainer title="CAC vs LTV" description="Comparison by channel">
+						<ChartContainer
+							title="CAC vs LTV"
+							description="Comparison by channel with legend persistence"
+							action={
+								hasSelectedChannel ? (
+									<button
+										onClick={() => setSelectedChannel(null)}
+										className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200"
+									>
+										Clear drill-down
+									</button>
+								) : null
+							}
+						>
 							<BarChart
-								data={channelChartData}
+								data={filteredChannelChartData}
 								dataKeys={[
 									{ key: 'cac', fill: '#ff6b35', name: 'CAC' },
 									{ key: 'ltv', fill: '#4f46e5', name: 'LTV' },
 								]}
+								hiddenSeries={interactions.hiddenSeriesByChart.cacLtv ?? []}
+								onLegendToggle={(dataKey) => toggleChartSeriesVisibility('cacLtv', dataKey)}
+								onBarClick={handleChannelDrillDown}
 								height={300}
 								xAxisKey="period"
 							/>
@@ -324,12 +489,18 @@ export default function DashboardHomePage() {
 					{loading ? (
 						<SkeletonChart />
 					) : (
-						<ChartContainer title="Pipeline by Stage" description="Sales velocity overview">
+						<ChartContainer
+							title="Pipeline by Stage"
+							description="Sales velocity overview with stage drill-down"
+						>
 							<BarChart
-								data={pipelineChartData}
+								data={filteredPipelineChartData}
 								dataKeys={[
 									{ key: 'count', fill: '#4f46e5', name: 'Deals' },
 								]}
+								hiddenSeries={interactions.hiddenSeriesByChart.pipeline ?? []}
+								onLegendToggle={(dataKey) => toggleChartSeriesVisibility('pipeline', dataKey)}
+								onBarClick={handleChannelDrillDown}
 								height={300}
 								xAxisKey="stage"
 							/>

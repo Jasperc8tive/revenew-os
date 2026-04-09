@@ -18,6 +18,9 @@ interface BarChartProps {
   height?: number;
   withLegend?: boolean;
   xAxisKey?: string;
+  hiddenSeries?: string[];
+  onLegendToggle?: (dataKey: string) => void;
+  onBarClick?: (payload: Record<string, unknown>) => void;
 }
 
 export function BarChart({
@@ -26,7 +29,38 @@ export function BarChart({
   height = 300,
   withLegend = true,
   xAxisKey = 'period',
+  hiddenSeries = [],
+  onLegendToggle,
+  onBarClick,
 }: BarChartProps) {
+  const handleLegendClick = React.useCallback(
+    (entry: unknown) => {
+      if (!onLegendToggle || !entry || typeof entry !== 'object') {
+        return;
+      }
+
+      const dataKey = (entry as { dataKey?: unknown }).dataKey;
+      if (typeof dataKey === 'string') {
+        onLegendToggle(dataKey);
+      }
+    },
+    [onLegendToggle],
+  );
+
+  const handleBarClick = React.useCallback(
+    (point: unknown) => {
+      if (!onBarClick || !point || typeof point !== 'object') {
+        return;
+      }
+
+      const maybePayload = (point as { payload?: unknown }).payload;
+      if (maybePayload && typeof maybePayload === 'object') {
+        onBarClick(maybePayload as Record<string, unknown>);
+      }
+    },
+    [onBarClick],
+  );
+
   return (
     <ResponsiveContainer width="100%" height={height}>
       <RechartsBarChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
@@ -46,13 +80,15 @@ export function BarChart({
           }}
           labelStyle={{ color: '#f1f5f9' }}
         />
-        {withLegend && <Legend />}
+        {withLegend && <Legend onClick={handleLegendClick} />}
         {dataKeys.map((item) => (
           <Bar
             key={item.key}
             dataKey={item.key}
             fill={item.fill}
             name={item.name || item.key}
+            hide={hiddenSeries.includes(item.key)}
+            onClick={handleBarClick}
             isAnimationActive={true}
           />
         ))}
