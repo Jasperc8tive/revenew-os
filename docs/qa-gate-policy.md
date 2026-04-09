@@ -105,6 +105,32 @@ Optional repository secrets:
 - `UI_QA_GATE_STAFF_MENTION`
 - `UI_QA_GATE_DELIVERY_MANAGER_MENTION`
 
+### Controlled Smoke Test (Production Failure Notifications)
+
+Use this when you need to validate alert delivery without waiting for an organic failure.
+
+Run steps:
+
+1. Ensure all five `UI_QA_GATE_*` secrets above are configured in repository Actions secrets.
+2. Open Actions and run `UI Crawler QA Gate` using `workflow_dispatch`.
+3. Set input `smoke_test_notifications` to `true`.
+4. Let the run proceed until the production job reaches `Force failure for notification smoke test`.
+5. Confirm `Notify on production gate failure` executes and the run ends in failed state.
+
+Validation criteria:
+
+- The production job fails at the forced-failure step and does not silently pass.
+- Slack receives one alert containing repository, branch, run URL, status, and failed checks.
+- Discord receives one alert containing repository, branch, run URL, status, and failed checks.
+- Mentions resolve according to secret values for Owner, Staff, and Delivery Manager.
+- Alert payload includes actionable findings section when findings exist.
+- If webhook secrets are intentionally removed, notifier logs `No webhook configured. Skipping notification.` and exits cleanly.
+
+Rollback after smoke test:
+
+1. Re-run workflow_dispatch with `smoke_test_notifications=false` for normal behavior.
+2. Do not enable the smoke input for regular production checks.
+
 ## Automated PR Comments
 
 When a pull request triggers the staging QA gate:

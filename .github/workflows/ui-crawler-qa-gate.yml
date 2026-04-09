@@ -8,6 +8,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      smoke_test_notifications:
+        description: Force production failure after QA gate to validate Slack and Discord alerts
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 env:
   DATABASE_URL: postgresql://revenew_user:dev_password@127.0.0.1:5432/revenew_os
@@ -200,14 +209,20 @@ jobs:
           CI: 'true'
         run: npm run qa:ui:crawl:ci:production
 
+      - name: Force failure for notification smoke test
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.smoke_test_notifications == 'true'
+        run: |
+          echo "Forcing production gate failure for notification smoke test."
+          exit 1
+
       - name: Notify on production gate failure
         if: failure()
         env:
-          OWNER_MENTION: ''
-          STAFF_MENTION: ''
-          DELIVERY_MANAGER_MENTION: ''
-          SLACK_WEBHOOK_URL: ''
-          DISCORD_WEBHOOK_URL: ''
+          OWNER_MENTION: ${{ secrets.UI_QA_GATE_OWNER_MENTION }}
+          STAFF_MENTION: ${{ secrets.UI_QA_GATE_STAFF_MENTION }}
+          DELIVERY_MANAGER_MENTION: ${{ secrets.UI_QA_GATE_DELIVERY_MANAGER_MENTION }}
+          SLACK_WEBHOOK_URL: ${{ secrets.UI_QA_GATE_SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.UI_QA_GATE_DISCORD_WEBHOOK_URL }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_RUN_ID: ${{ github.run_id }}
