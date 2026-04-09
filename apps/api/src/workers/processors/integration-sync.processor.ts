@@ -44,6 +44,36 @@ export class IntegrationSyncProcessor extends WorkerHost {
   async process(
     job: Job<{ organizationId: string; integrationId: string; provider: IntegrationProvider }>,
   ) {
+    const integration = await this.prisma.integration.findFirst({
+      where: {
+        id: job.data.integrationId,
+        organizationId: job.data.organizationId,
+      },
+    });
+
+    if (!integration) {
+      throw new Error(`Integration ${job.data.integrationId} was not found.`);
+    }
+
+    if (integration.status !== IntegrationStatus.ACTIVE) {
+      return {
+        provider: job.data.provider,
+        status: IntegrationSyncStatus.PENDING,
+        records: [],
+        syncedAt: new Date().toISOString(),
+        health: 'degraded' as const,
+        errorMessage: `Sync skipped because integration is ${integration.status}.`,
+      };
+    }
+
+    await this.prisma.integration.update({
+      where: { id: integration.id },
+      data: {
+        status: IntegrationStatus.PENDING,
+        updatedAt: new Date(),
+      },
+    });
+
     const connector = this.connectorsService.getConnector(job.data.provider);
     const credential = await this.prisma.integrationCredential.findFirst({
       where: {
@@ -55,6 +85,11 @@ export class IntegrationSyncProcessor extends WorkerHost {
     });
 
     if (!credential) {
+      await this.handleSyncFailure(
+        job.data.integrationId,
+        job.data.provider,
+        `No credentials found for integration ${job.data.integrationId}.`,
+      );
       throw new Error(`No credentials found for integration ${job.data.integrationId}.`);
     }
 
@@ -68,7 +103,17 @@ export class IntegrationSyncProcessor extends WorkerHost {
       refreshToken: decryptedRefreshToken,
     });
 
-    const result = await connector.sync();
+    let result: ConnectorSyncResult;
+    try {
+      result = await connector.sync();
+    } catch (error) {
+      await this.handleSyncFailure(
+        job.data.integrationId,
+        job.data.provider,
+        error instanceof Error ? error.message : 'Connector sync failed.',
+      );
+      throw error;
+    }
     const validationSummary = this.validateRecords(result.records);
     const filteredRecords = result.records.filter((_, index) =>
       !validationSummary.issues.some((issue) => issue.index === index),
@@ -178,6 +223,29 @@ export class IntegrationSyncProcessor extends WorkerHost {
         syncedAt: new Date(result.syncedAt),
         errorMessage: result.errorMessage,
       },
+    });
+  }
+
+  private async handleSyncFailure(
+    integrationId: string,
+    provider: IntegrationProvider,
+    message: string,
+  ) {
+    await this.prisma.integration.update({
+      where: { id: integrationId },
+      data: {
+        status: IntegrationStatus.ERROR,
+        updatedAt: new Date(),
+      },
+    });
+
+    await this.writeSyncLog(integrationId, {
+      provider,
+      status: IntegrationSyncStatus.FAILED,
+      records: [],
+      syncedAt: new Date().toISOString(),
+      health: 'error',
+      errorMessage: message,
     });
   }
 

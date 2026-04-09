@@ -53,6 +53,7 @@ describe('IntegrationSyncProcessor', () => {
         update: asyncMock(),
       },
       integration: {
+        findFirst: asyncMock(),
         update: asyncMock(),
       },
       integrationSyncLog: {
@@ -69,6 +70,10 @@ describe('IntegrationSyncProcessor', () => {
           refreshToken: 'enc(refresh-token)',
           createdAt: new Date(),
         }));
+    prismaMock.integration.findFirst.mockImplementation(async () => ({
+      id: 'integration-1',
+      status: IntegrationStatus.ACTIVE,
+    }));
     prismaMock.integration.update.mockImplementation(async () => ({
       id: 'integration-1',
       status: IntegrationStatus.ACTIVE,
@@ -190,6 +195,7 @@ describe('IntegrationSyncProcessor', () => {
         update: asyncMock(),
       },
       integration: {
+        findFirst: asyncMock(),
         update: asyncMock(),
       },
       integrationSyncLog: {
@@ -205,6 +211,10 @@ describe('IntegrationSyncProcessor', () => {
       encryptedToken: 'enc(access-token)',
       refreshToken: 'enc(refresh-token)',
       createdAt: new Date(),
+    }));
+    prismaMock.integration.findFirst.mockImplementation(async () => ({
+      id: 'integration-1',
+      status: IntegrationStatus.ACTIVE,
     }));
     prismaMock.integration.update.mockImplementation(async () => ({
       id: 'integration-1',
@@ -329,6 +339,7 @@ describe('IntegrationSyncProcessor', () => {
         update: asyncMock(),
       },
       integration: {
+        findFirst: asyncMock(),
         update: asyncMock(),
       },
       integrationSyncLog: {
@@ -344,6 +355,10 @@ describe('IntegrationSyncProcessor', () => {
       encryptedToken: 'enc(access-token)',
       refreshToken: 'enc(refresh-token)',
       createdAt: new Date(),
+    }));
+    prismaMock.integration.findFirst.mockImplementation(async () => ({
+      id: 'integration-1',
+      status: IntegrationStatus.ACTIVE,
     }));
     prismaMock.integration.update.mockImplementation(async () => ({
       id: 'integration-1',

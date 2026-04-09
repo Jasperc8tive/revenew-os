@@ -1,5 +1,5 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { IntegrationStatus, IntegrationSyncStatus } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -151,6 +151,10 @@ export class IntegrationsService {
       throw new NotFoundException('Integration not found.');
     }
 
+    if (integration.status !== IntegrationStatus.ACTIVE) {
+      throw new BadRequestException('Only active integrations can be synced.');
+    }
+
     await this.integrationSyncQueue.add(
       'sync-integration',
       {
@@ -160,6 +164,7 @@ export class IntegrationsService {
         initiatedBy,
       },
       {
+        jobId: `sync:${organizationId}:${integrationId}`,
         attempts: 3,
         backoff: {
           type: 'exponential',

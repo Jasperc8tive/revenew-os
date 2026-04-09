@@ -16,6 +16,7 @@ import { CompetitiveModule } from './competitive/competitive.module';
 import { AuthModule } from './auth/auth.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { DataQualityModule } from './data-quality/data-quality.module';
+import { OperationsModule } from './operations/operations.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { DataQualityModule } from './data-quality/data-quality.module';
     AuthModule,
     RecommendationsModule,
     DataQualityModule,
+    OperationsModule,
   ],
   controllers: [],
   providers: [],

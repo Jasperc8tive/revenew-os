@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDashboardStore } from '@/lib/store/dashboardStore';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface DashboardMetrics {
   revenue: { value: string; trend: { value: number; direction: 'up' | 'down'; period: string } };
@@ -21,6 +22,7 @@ export interface DashboardData {
 // Hook to fetch dashboard metrics
 export function useDashboardMetrics() {
   const { filters, setLoading, setError } = useDashboardStore();
+  const { organizationId } = useAuth();
   const [data, setData] = useState<DashboardMetrics | null>(null);
 
   useEffect(() => {
@@ -30,6 +32,7 @@ export function useDashboardMetrics() {
         setError(null);
 
         const params = new URLSearchParams({
+          ...(organizationId ? { organizationId } : {}),
           startDate: filters.dateRange.start.toISOString(),
           endDate: filters.dateRange.end.toISOString(),
           ...(filters.metric && { metric: filters.metric }),
@@ -50,7 +53,7 @@ export function useDashboardMetrics() {
     };
 
     fetchMetrics();
-  }, [filters, setLoading, setError]);
+  }, [filters, organizationId, setLoading, setError]);
 
   return data;
 }
@@ -58,6 +61,7 @@ export function useDashboardMetrics() {
 // Hook to fetch revenue chart data
 export function useDashboardCharts() {
   const { filters, setLoading, setError } = useDashboardStore();
+  const { organizationId } = useAuth();
   const [data, setData] = useState<{
     revenueData: Array<{ date: string; revenue: number }>;
     cacLtvData: Array<{ period: string; cac: number; ltv: number }>;
@@ -71,6 +75,7 @@ export function useDashboardCharts() {
         setError(null);
 
         const params = new URLSearchParams({
+          ...(organizationId ? { organizationId } : {}),
           startDate: filters.dateRange.start.toISOString(),
           endDate: filters.dateRange.end.toISOString(),
         });
@@ -88,7 +93,7 @@ export function useDashboardCharts() {
     };
 
     fetchCharts();
-  }, [filters, setLoading, setError]);
+  }, [filters, organizationId, setLoading, setError]);
 
   return data;
 }
@@ -96,6 +101,7 @@ export function useDashboardCharts() {
 // Hook to fetch AI insights
 export function useDashboardInsights() {
   const { filters, setLoading, setError } = useDashboardStore();
+  const { organizationId } = useAuth();
   const [data, setData] = useState<Array<{ id: string; title: string; description: string; impact: 'high' | 'medium' | 'low'; action: string }> | null>(null);
 
   useEffect(() => {
@@ -105,6 +111,7 @@ export function useDashboardInsights() {
         setError(null);
 
         const params = new URLSearchParams({
+          ...(organizationId ? { organizationId } : {}),
           startDate: filters.dateRange.start.toISOString(),
           endDate: filters.dateRange.end.toISOString(),
         });
@@ -122,7 +129,7 @@ export function useDashboardInsights() {
     };
 
     fetchInsights();
-  }, [filters, setLoading, setError]);
+  }, [filters, organizationId, setLoading, setError]);
 
   return data;
 }

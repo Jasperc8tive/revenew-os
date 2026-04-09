@@ -35,6 +35,15 @@ export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(AUTH_COOKIE_KEY)?.value);
 
+  if (pathname === '/dashboard/dashboard' || pathname.startsWith('/dashboard/dashboard/')) {
+    const normalizedPath = pathname.replace('/dashboard/dashboard', '/dashboard');
+    const redirectUrl = new URL(normalizedPath || '/dashboard', request.url);
+    if (search) {
+      redirectUrl.search = search;
+    }
+    return NextResponse.redirect(redirectUrl);
+  }
+
   if (pathname === '/') {
     if (hasSession) {
       return NextResponse.redirect(new URL('/dashboard', request.url));

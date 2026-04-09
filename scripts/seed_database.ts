@@ -1,8 +1,12 @@
 // Database seeding script - populates initial test data
 // Run this after migrations to set up demo organizations and users
 
+import { execSync } from 'child_process';
+
 export async function seedDatabase() {
-  // TODO: Implement database seeding logic
+  execSync('npm run db:seed', {
+    stdio: 'inherit',
+  });
 }
 
 seedDatabase().catch((error) => {

@@ -62,6 +62,10 @@ export class PaymentService {
       throw new BadRequestException('Payment reference not found');
     }
 
+    if (payment.status === PaymentStatus.SUCCESS) {
+      return payment;
+    }
+
     if (verification.status === 'success') {
       const updatedPayment = await this.prisma.payment.update({
         where: { id: payment.id },
@@ -75,15 +79,35 @@ export class PaymentService {
         await this.invoiceService.markInvoicePaid(updatedPayment.invoiceId);
       }
 
+      if (updatedPayment.subscriptionId) {
+        await this.prisma.subscription.updateMany({
+          where: { id: updatedPayment.subscriptionId },
+          data: {
+            status: 'ACTIVE',
+          },
+        });
+      }
+
       return updatedPayment;
     }
 
-    return this.prisma.payment.update({
+    const updatedPayment = await this.prisma.payment.update({
       where: { id: payment.id },
       data: {
         status: verification.status === 'failed' ? PaymentStatus.FAILED : PaymentStatus.PENDING,
       },
     });
+
+    if (updatedPayment.subscriptionId && verification.status === 'failed') {
+      await this.prisma.subscription.updateMany({
+        where: { id: updatedPayment.subscriptionId },
+        data: {
+          status: 'PAST_DUE',
+        },
+      });
+    }
+
+    return updatedPayment;
   }
 
   async processWebhook(provider: PaymentProviderName, payload: Record<string, unknown>, signature: string) {
@@ -128,7 +152,20 @@ export class PaymentService {
           eventId,
           eventType: event.eventType,
           reference: event.reference,
-          status: 'RECEIVED',
+          status: 'PROCESSING',
+          payload: payload as Prisma.InputJsonValue,
+        },
+      });
+    } else {
+      await this.prisma.webhookEvent.update({
+        where: {
+          provider_eventId: {
+            provider,
+            eventId,
+          },
+        },
+        data: {
+          status: 'PROCESSING',
           payload: payload as Prisma.InputJsonValue,
         },
       });

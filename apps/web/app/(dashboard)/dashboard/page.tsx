@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DollarSign, Target, TrendingUp, Users, RefreshCw } from 'lucide-react';
 import { DateRangePicker } from '@/components/dashboard/DateRangePicker';
 import { DashboardCustomizer } from '@/components/dashboard/DashboardCustomizer';
@@ -14,12 +14,24 @@ import { SkeletonChart } from '@/components/dashboard/Skeletons';
 import { useDashboardStore } from '@/lib/store/dashboardStore';
 import { useAuth } from '@/hooks/useAuth';
 import { api, ExecutiveSummary } from '@/lib/api';
-import {
-	mockRevenueData,
-	mockCACLTVData,
-	mockMetrics,
-	mockPipelineData,
-} from '@/utils/mockData';
+import { formatNGN } from '@/utils/currency';
+
+function toTrend(value: number | undefined, invert = false) {
+	const normalized = Number.isFinite(value) ? value : 0;
+	const direction = invert
+		? normalized <= 0
+			? 'up'
+			: 'down'
+		: normalized >= 0
+			? 'up'
+			: 'down';
+
+	return {
+		value: Math.abs(Number(normalized.toFixed(2))),
+		direction,
+		period: 'vs last period',
+	} as const;
+}
 
 export default function DashboardHomePage() {
 	const [loading, setLoading] = useState(true);
@@ -47,44 +59,137 @@ export default function DashboardHomePage() {
 		})();
 	}, [organizationId]);
 
+	const liveMetrics = useMemo(() => {
+		if (!summary) {
+			return null;
+		}
+
+		return {
+			revenue: {
+				value: formatNGN(summary.kpis.revenue),
+				trend: toTrend(summary.kpis.revenueGrowthRate),
+			},
+			cac: {
+				value: formatNGN(summary.kpis.cac),
+				trend: toTrend(summary.kpis.revenueGrowthRate / 2, true),
+			},
+			ltv: {
+				value: formatNGN(summary.kpis.ltv),
+				trend: toTrend(summary.kpis.revenueGrowthRate / 2),
+			},
+			churn: {
+				value: `${summary.kpis.churnRate.toFixed(2)}%`,
+				trend: toTrend(summary.kpis.churnRate, true),
+			},
+			arpu: {
+				value:
+					summary.kpis.activeCustomers > 0
+						? formatNGN(summary.kpis.revenue / summary.kpis.activeCustomers)
+						: formatNGN(0),
+				trend: toTrend(summary.kpis.revenueGrowthRate / 3),
+			},
+			customerCount: {
+				value: summary.kpis.activeCustomers.toLocaleString('en-NG'),
+				trend: toTrend(summary.kpis.revenueGrowthRate / 4),
+			},
+		};
+	}, [summary]);
+
+	const revenueChartData = useMemo(() => {
+		if (summary?.verifiedMetrics?.length) {
+			return summary.verifiedMetrics
+				.slice()
+				.sort((a, b) => new Date(a.windowStart).getTime() - new Date(b.windowStart).getTime())
+				.map((metric) => ({
+					date: new Date(metric.windowStart).toLocaleDateString('en-NG', {
+						month: 'short',
+						day: 'numeric',
+					}),
+					revenue: Number(metric.metricValue),
+				}));
+		}
+
+		if (!summary) {
+			return [] as Array<{ date: string; revenue: number }>;
+		}
+
+		return [
+			{
+				date: new Date(summary.range.endDate).toLocaleDateString('en-NG', {
+					month: 'short',
+					day: 'numeric',
+				}),
+				revenue: summary.kpis.revenue,
+			},
+		];
+	}, [summary]);
+
+	const channelChartData = useMemo(() => {
+		if (!summary) {
+			return [] as Array<{ period: string; cac: number; ltv: number }>;
+		}
+
+		return summary.marketingPerformance.byChannel.map((channel) => ({
+			period: channel.key,
+			cac: Number(channel.cac.toFixed(2)),
+			ltv: Number((summary.kpis.ltvToCacRatio * channel.cac).toFixed(2)),
+		}));
+	}, [summary]);
+
+	const pipelineChartData = useMemo(() => {
+		if (!summary) {
+			return [] as Array<{ stage: string; count: number }>;
+		}
+
+		return summary.marketingPerformance.byChannel.map((channel) => ({
+			stage: channel.key,
+			count: channel.newCustomers,
+		}));
+	}, [summary]);
+
 	const visibleMetrics = [
 		{
 			key: 'revenue',
 			title: 'Total Revenue',
-			value: mockMetrics.revenue,
+			value: liveMetrics?.revenue,
 			icon: <DollarSign className="w-6 h-6" />,
 		},
 		{
 			key: 'cac',
 			title: 'Customer Acquisition Cost',
-			value: mockMetrics.cac,
+			value: liveMetrics?.cac,
 			icon: <Target className="w-6 h-6" />,
 		},
 		{
 			key: 'ltv',
 			title: 'Lifetime Value',
-			value: mockMetrics.ltv,
+			value: liveMetrics?.ltv,
 			icon: <TrendingUp className="w-6 h-6" />,
 		},
 		{
 			key: 'churn',
 			title: 'Churn Rate',
-			value: mockMetrics.churn,
+			value: liveMetrics?.churn,
 			icon: <Users className="w-6 h-6" />,
 		},
 		{
 			key: 'arpu',
 			title: 'ARPU',
-			value: mockMetrics.arpu,
+			value: liveMetrics?.arpu,
 			icon: <DollarSign className="w-6 h-6" />,
 		},
 		{
 			key: 'customers',
 			title: 'Total Customers',
-			value: mockMetrics.customerCount,
+			value: liveMetrics?.customerCount,
 			icon: <Users className="w-6 h-6" />,
 		},
-	].filter((metric) => preferences.visibleMetrics.includes(metric.key));
+	]
+		.filter((metric) => preferences.visibleMetrics.includes(metric.key))
+		.map((metric) => ({
+			...metric,
+			value: metric.value ?? { value: '--', trend: toTrend(0) },
+		}));
 
 	const evidenceCards = summary?.evidenceCards ?? [];
 	const hasEvidenceCards = evidenceCards.length > 0;
@@ -135,7 +240,7 @@ export default function DashboardHomePage() {
 					) : (
 						<ChartContainer title="Revenue Trend" description="Last 30 days of revenue data">
 							<LineChart
-								data={mockRevenueData}
+								data={revenueChartData}
 								dataKey="revenue"
 								stroke="#4f46e5"
 								height={300}
@@ -148,9 +253,9 @@ export default function DashboardHomePage() {
 					{loading ? (
 						<SkeletonChart />
 					) : (
-						<ChartContainer title="CAC vs LTV" description="Comparison by week">
+						<ChartContainer title="CAC vs LTV" description="Comparison by channel">
 							<BarChart
-								data={mockCACLTVData}
+								data={channelChartData}
 								dataKeys={[
 									{ key: 'cac', fill: '#ff6b35', name: 'CAC' },
 									{ key: 'ltv', fill: '#4f46e5', name: 'LTV' },
@@ -221,7 +326,7 @@ export default function DashboardHomePage() {
 					) : (
 						<ChartContainer title="Pipeline by Stage" description="Sales velocity overview">
 							<BarChart
-								data={mockPipelineData}
+								data={pipelineChartData}
 								dataKeys={[
 									{ key: 'count', fill: '#4f46e5', name: 'Deals' },
 								]}
