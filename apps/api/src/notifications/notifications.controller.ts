@@ -42,6 +42,11 @@ export class NotificationsController {
     return this.alertRulesService.listEvents(query);
   }
 
+  @Get('lifecycle')
+  async lifecycle(@Query('organizationId') organizationId: string) {
+    return this.alertRulesService.getLifecycleSummary(organizationId);
+  }
+
   @Post('evaluate')
   async evaluateAll() {
     return this.alertRulesService.evaluateAll();

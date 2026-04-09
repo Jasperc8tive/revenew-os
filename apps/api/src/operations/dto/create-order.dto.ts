@@ -27,4 +27,16 @@ export class CreateOrderDto {
   @IsOptional()
   @IsArray()
   items?: Array<Record<string, unknown>>;
+
+  @IsOptional()
+  @IsString()
+  assigneeId?: string;
+
+  @IsOptional()
+  @IsString()
+  sourceMessageId?: string;
+
+  @IsOptional()
+  @IsString()
+  sourceConversationId?: string;
 }

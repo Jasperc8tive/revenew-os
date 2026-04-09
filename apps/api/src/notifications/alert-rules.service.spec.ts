@@ -17,6 +17,7 @@ const makePrisma = () => ({
   alertEvent: {
     create: jest.fn(),
     findMany: jest.fn(),
+    findFirst: jest.fn(),
   },
 });
 
@@ -51,6 +52,7 @@ describe('AlertRulesService', () => {
     jest.clearAllMocks();
 
     billing.assertFeatureAccess.mockImplementation(async () => undefined);
+    prisma.alertEvent.findFirst.mockImplementation(async () => null);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

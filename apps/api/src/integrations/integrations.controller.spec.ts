@@ -12,6 +12,7 @@ import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
 import { IntegrationCryptoService } from './services/integration-crypto.service';
 import { IntegrationMonitoringService } from './services/integration-monitoring.service';
+import { OnboardingService } from '../onboarding/onboarding.service';
 
 describe('IntegrationsController (e2e)', () => {
   let app: INestApplication;
@@ -31,6 +32,10 @@ describe('IntegrationsController (e2e)', () => {
 
   const billingAccessServiceMock = {
     assertFeatureAccess: jest.fn(async () => undefined),
+  };
+
+  const onboardingServiceMock = {
+    markMilestone: jest.fn(async () => undefined),
   };
 
   const prismaMock = {
@@ -73,6 +78,10 @@ describe('IntegrationsController (e2e)', () => {
         {
           provide: BillingAccessService,
           useValue: billingAccessServiceMock,
+        },
+        {
+          provide: OnboardingService,
+          useValue: onboardingServiceMock,
         },
         {
           provide: IntegrationCryptoService,

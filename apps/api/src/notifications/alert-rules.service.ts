@@ -90,6 +90,60 @@ export class AlertRulesService {
     });
   }
 
+  async getLifecycleSummary(organizationId: string) {
+    await this.billingAccessService.assertFeatureAccess(organizationId, 'analytics.basic');
+
+    const [ruleStats, recentEvents] = await Promise.all([
+      this.prisma.alertRule.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          name: true,
+          metric: true,
+          active: true,
+          lastCheckedAt: true,
+          _count: {
+            select: {
+              events: true,
+            },
+          },
+        },
+      }),
+      this.prisma.alertEvent.findMany({
+        where: {
+          rule: {
+            organizationId,
+          },
+        },
+        include: {
+          rule: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          firedAt: 'desc',
+        },
+        take: 20,
+      }),
+    ]);
+
+    return {
+      organizationId,
+      rules: ruleStats.map((item) => ({
+        id: item.id,
+        name: item.name,
+        metric: item.metric,
+        active: item.active,
+        lastCheckedAt: item.lastCheckedAt,
+        totalEvents: item._count.events,
+      })),
+      recentEvents,
+    };
+  }
+
   async evaluateAll() {
     const rules = await this.prisma.alertRule.findMany({
       where: { active: true },
@@ -118,6 +172,47 @@ export class AlertRulesService {
         ruleId: rule.id,
         triggered: false,
         metricValue,
+      };
+    }
+
+    const recentEvent = await this.prisma.alertEvent.findFirst({
+      where: {
+        ruleId: rule.id,
+        status: 'SENT',
+        firedAt: {
+          gte: new Date(Date.now() - 30 * 60 * 1000),
+        },
+      },
+      orderBy: {
+        firedAt: 'desc',
+      },
+    });
+
+    if (recentEvent && Math.abs(Number(recentEvent.metricValue) - metricValue) < 0.0001) {
+      const dedupedEvent = await this.prisma.alertEvent.create({
+        data: {
+          ruleId: rule.id,
+          metricValue,
+          status: 'SENT',
+          deliveryDetails: {
+            deduplicated: true,
+            duplicateOf: recentEvent.id,
+            suppressedAt: new Date().toISOString(),
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      await this.prisma.alertRule.update({
+        where: { id: rule.id },
+        data: { lastCheckedAt: new Date() },
+      });
+
+      return {
+        ruleId: rule.id,
+        triggered: true,
+        deduplicated: true,
+        metricValue,
+        eventId: dedupedEvent.id,
       };
     }
 

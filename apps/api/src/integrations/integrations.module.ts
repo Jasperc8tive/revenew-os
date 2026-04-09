@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BillingModule } from '../billing/billing.module';
 import { ConnectorsModule } from '../connectors/connectors.module';
+import { OnboardingModule } from '../onboarding/onboarding.module';
 import { IntegrationSyncScheduler } from '../scheduler/scheduler.service';
 import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
@@ -14,6 +15,7 @@ import { IntegrationMonitoringService } from './services/integration-monitoring.
 		ConfigModule,
 		BillingModule,
 		ConnectorsModule,
+		OnboardingModule,
 		BullModule.forRootAsync({
 			imports: [ConfigModule],
 			inject: [ConfigService],

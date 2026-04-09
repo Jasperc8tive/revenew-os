@@ -4,6 +4,7 @@ import { IntegrationStatus, IntegrationSyncStatus } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ConnectorsService } from '../connectors/connectors.service';
+import { OnboardingService } from '../onboarding/onboarding.service';
 import { ConnectIntegrationDto } from './dto/connect-integration.dto';
 import { IntegrationCryptoService } from './services/integration-crypto.service';
 import { IntegrationMonitoringService } from './services/integration-monitoring.service';
@@ -16,6 +17,7 @@ export class IntegrationsService {
     private readonly connectorsService: ConnectorsService,
     private readonly integrationCryptoService: IntegrationCryptoService,
     private readonly monitoringService: IntegrationMonitoringService,
+    private readonly onboardingService: OnboardingService,
     @InjectQueue('integration-sync') private readonly integrationSyncQueue: Queue,
   ) {}
 
@@ -68,6 +70,10 @@ export class IntegrationsService {
         errorMessage: authResult.errorMessage,
       },
     });
+
+    if (authResult.success) {
+      await this.onboardingService.markMilestone(dto.organizationId, 'connect_integration');
+    }
 
     return {
       id: integration.id,

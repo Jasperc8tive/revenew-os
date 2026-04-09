@@ -18,6 +18,9 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
 import { DataQualityModule } from './data-quality/data-quality.module';
 import { OperationsModule } from './operations/operations.module';
 import { AgentsModule } from './agents/agents.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
+import { AdminModule } from './admin/admin.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -42,6 +45,9 @@ import { AgentsModule } from './agents/agents.module';
     DataQualityModule,
     OperationsModule,
     AgentsModule,
+    OnboardingModule,
+    AdminModule,
+    ReportsModule,
   ],
   controllers: [],
   providers: [],
