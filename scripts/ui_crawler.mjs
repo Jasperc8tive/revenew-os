@@ -115,7 +115,7 @@ function runProcess(command, args, options = {}) {
     cwd: options.cwd || ROOT_DIR,
     env: options.env || process.env,
     stdio: 'pipe',
-    shell: false,
+    shell: process.platform === 'win32',
   });
 
   const name = options.name || command;

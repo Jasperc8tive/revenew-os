@@ -1,6 +1,6 @@
 /* eslint-env node */
 
-import { spawn } from 'child_process';
+import { execSync } from 'child_process';
 import path from 'path';
 import process from 'process';
 
@@ -72,17 +72,35 @@ if (printConfigOnly) {
   process.exit(0);
 }
 
-const crawlerPath = path.join(process.cwd(), 'scripts', 'ui_crawler.mjs');
-const child = spawn(process.execPath, [crawlerPath], {
-  stdio: 'inherit',
-  env,
-});
+const crawlerPath = path.resolve(process.cwd(), 'scripts', 'ui_crawler.mjs');
+const nodeExe = process.execPath;
 
-child.on('exit', (code) => {
-  process.exit(code ?? 1);
-});
+// Build environment for the child process
+const childEnv = { ...process.env };
+for (const [key, value] of Object.entries(env)) {
+  childEnv[key] = value;
+}
 
-child.on('error', (error) => {
-  process.stderr.write(`Failed to launch UI crawler profile runner: ${error.message}\n`);
+try {
+  // Use execSync with shell: true for better Windows compatibility
+  const isWindows = process.platform === 'win32';
+  const cmd = isWindows 
+    ? `"${nodeExe}" "${crawlerPath}"` 
+    : `${nodeExe} ${crawlerPath}`;
+  
+  execSync(cmd, {
+    stdio: 'inherit',
+    env: childEnv,
+    shell: true,
+  });
+  
+  process.exit(0);
+} catch (error) {
+  // execSync already exits with non-zero code, just re-throw
+  if (error.status) {
+    process.exit(error.status);
+  }
+  
+  process.stderr.write(`Failed to launch UI crawler: ${error instanceof Error ? error.message : String(error)}\n`);
   process.exit(1);
-});
+}
