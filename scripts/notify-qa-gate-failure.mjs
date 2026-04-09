@@ -219,8 +219,25 @@ async function main() {
   try {
     report = JSON.parse(await fs.promises.readFile(reportPath, 'utf8'));
   } catch (error) {
-    console.error(`Failed to parse report file at ${reportPath}: ${error.message}`);
-    process.exit(1);
+    // Fall back to a synthetic failure report so notification still goes out.
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+      report = {
+        qaGate: {
+          passed: false,
+          failures: [`critical: qa-report-missing (${reportPath})`],
+        },
+        actionableIssues: [
+          {
+            type: 'qa-report-missing',
+            count: 1,
+            description: 'UI crawler did not produce artifacts/ui-crawler/qa-report.json before notification step.',
+          },
+        ],
+      };
+    } else {
+      console.error(`Failed to parse report file at ${reportPath}: ${error.message}`);
+      process.exit(1);
+    }
   }
 
   const qaGate = report.qaGate || {};
