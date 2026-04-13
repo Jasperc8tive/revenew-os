@@ -1,9 +1,12 @@
 ﻿import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
 import { resolve } from 'path';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { JwtGuard } from './common/guards/jwt.guard';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { WorkersModule } from './workers/workers.module';
 import { BillingModule } from './billing/billing.module';
@@ -31,6 +34,7 @@ import { HealthController } from './health.controller';
       isGlobal: true,
       envFilePath: resolve(process.cwd(), '..', '..', '.env'),
     }),
+    JwtModule.register({ global: true }),
     AnalyticsModule,
     PrismaModule,
     ScheduleModule.forRoot(),
@@ -55,7 +59,12 @@ import { HealthController } from './health.controller';
     GovernanceModule,
   ],
   controllers: [HealthController],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtGuard,
+    },
+  ],
 })
 export class AppModule {}
 

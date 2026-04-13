@@ -1,41 +1,80 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { MembershipRole } from '@prisma/client';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
-type AuthenticatedUser = {
-	id: string;
-	organizationId?: string;
-	role?: MembershipRole;
+type JwtPayload = {
+  sub: string;
+  email: string;
+  organizationId: string;
+  role: MembershipRole;
+  iat?: number;
+  exp?: number;
+};
+
+export type AuthenticatedUser = {
+  id: string;
+  email: string;
+  organizationId: string;
+  role: MembershipRole;
 };
 
 @Injectable()
 export class JwtGuard implements CanActivate {
-	canActivate(context: ExecutionContext): boolean {
-		const request = context.switchToHttp().getRequest();
-		const fallbackUser: AuthenticatedUser = { id: 'system-user', role: MembershipRole.OWNER };
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private readonly reflector: Reflector,
+  ) {}
 
-		const existing = request.user as Partial<AuthenticatedUser> | undefined;
-		if (existing?.id) {
-			request.user = {
-				id: existing.id,
-				organizationId: existing.organizationId,
-				role: existing.role,
-			};
-			return true;
-		}
+  canActivate(context: ExecutionContext): boolean {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
-		const headerUserId = request.headers?.['x-user-id'];
-		const headerOrgId = request.headers?.['x-organization-id'];
-		const headerRole = request.headers?.['x-user-role'];
-		const parsedRole =
-			typeof headerRole === 'string' && Object.values(MembershipRole).includes(headerRole as MembershipRole)
-				? (headerRole as MembershipRole)
-				: fallbackUser.role;
+    if (isPublic) {
+      return true;
+    }
 
-		request.user = {
-			id: typeof headerUserId === 'string' ? headerUserId : fallbackUser.id,
-			organizationId: typeof headerOrgId === 'string' ? headerOrgId : undefined,
-			role: parsedRole,
-		};
-		return true;
-	}
+    const request = context.switchToHttp().getRequest<{
+      headers: Record<string, string | undefined>;
+      user?: AuthenticatedUser;
+    }>();
+
+    const authHeader = request.headers?.['authorization'];
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Missing or malformed authorization token');
+    }
+
+    const token = authHeader.slice(7);
+    const secret = this.configService.get<string>('JWT_SECRET');
+
+    if (!secret) {
+      throw new UnauthorizedException('Server misconfiguration: JWT_SECRET is not set');
+    }
+
+    try {
+      const payload = this.jwtService.verify<JwtPayload>(token, { secret });
+
+      request.user = {
+        id: payload.sub,
+        email: payload.email,
+        organizationId: payload.organizationId,
+        role: payload.role,
+      };
+
+      return true;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+  }
 }

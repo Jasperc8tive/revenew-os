@@ -66,7 +66,6 @@ describe('IntegrationsController (e2e)', () => {
       providers: [
         IntegrationsService,
         IntegrationMonitoringService,
-        JwtGuard,
         {
           provide: PrismaService,
           useValue: prismaMock,
@@ -95,7 +94,10 @@ describe('IntegrationsController (e2e)', () => {
           useValue: queueMock,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ transform: true }));

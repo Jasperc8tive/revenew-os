@@ -576,7 +576,6 @@ describe('AnalyticsController (e2e)', () => {
       controllers: [AnalyticsController],
       providers: [
         AnalyticsService,
-        JwtGuard,
         {
           provide: BillingAccessService,
           useValue: billingAccessServiceMock,
@@ -602,7 +601,10 @@ describe('AnalyticsController (e2e)', () => {
           useValue: verifiedMetricsServiceMock,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ transform: true }));
