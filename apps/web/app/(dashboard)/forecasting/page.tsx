@@ -293,7 +293,7 @@ export default function ForecastingPage() {
                     axisLine={false}
                   />
                   <Tooltip
-                    formatter={(value: number) => formatNaira(value)}
+                    formatter={(value) => value != null ? formatNaira(Number(value)) : ''}
                     contentStyle={{
                       fontSize: 12,
                       borderRadius: 8,

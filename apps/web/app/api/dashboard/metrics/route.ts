@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
         trend: toTrend(summary.kpis.revenueGrowthRate / 4),
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch metrics' },
       { status: 500 }

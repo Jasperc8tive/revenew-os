@@ -1,13 +1,12 @@
 import Link from 'next/link';
 
 type UnauthorizedPageProps = {
-  searchParams?: {
-    from?: string;
-  };
+  searchParams?: Promise<{ from?: string }>;
 };
 
-export default function UnauthorizedPage({ searchParams }: UnauthorizedPageProps) {
-  const attemptedPath = searchParams?.from;
+export default async function UnauthorizedPage({ searchParams }: UnauthorizedPageProps) {
+  const resolvedParams = await searchParams;
+  const attemptedPath = resolvedParams?.from;
 
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center px-4 py-10">
