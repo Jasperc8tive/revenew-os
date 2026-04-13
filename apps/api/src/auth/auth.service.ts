@@ -83,29 +83,35 @@ export class AuthService {
     // Hash password
     const passwordHash = await hash(payload.password, 10);
 
-    // Create user and organization in a transaction
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-      },
-    });
+    // Create user, organization, and membership atomically so a failure
+    // at any step does not leave orphaned records in the database.
+    const { user, organization, membership } = await this.prisma.$transaction(
+      async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            email,
+            passwordHash,
+          },
+        });
 
-    const organization = await this.prisma.organization.create({
-      data: {
-        name: payload.organizationName,
-        industry: payload.industry,
-      },
-    });
+        const newOrganization = await tx.organization.create({
+          data: {
+            name: payload.organizationName,
+            industry: payload.industry,
+          },
+        });
 
-    // Create membership linking user to organization with OWNER role
-    const membership = await this.prisma.membership.create({
-      data: {
-        userId: user.id,
-        organizationId: organization.id,
-        role: MembershipRole.OWNER,
+        const newMembership = await tx.membership.create({
+          data: {
+            userId: newUser.id,
+            organizationId: newOrganization.id,
+            role: MembershipRole.OWNER,
+          },
+        });
+
+        return { user: newUser, organization: newOrganization, membership: newMembership };
       },
-    });
+    );
 
     // Generate JWT token for auto-login
     const jwtPayload = {

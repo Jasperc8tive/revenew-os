@@ -7,6 +7,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { resolve } from 'path';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { JwtGuard } from './common/guards/jwt.guard';
+import { validateEnv } from './config/env.validation';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { WorkersModule } from './workers/workers.module';
 import { BillingModule } from './billing/billing.module';
@@ -33,6 +34,7 @@ import { HealthController } from './health.controller';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: resolve(process.cwd(), '..', '..', '.env'),
+      validate: validateEnv,
     }),
     JwtModule.register({ global: true }),
     AnalyticsModule,
