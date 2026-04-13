@@ -49,7 +49,7 @@ export class AuthService {
       role: membership.role,
     };
 
-    const secret = this.configService.get<string>('JWT_SECRET', 'revenew-default-secret');
+    const secret = this.configService.getOrThrow<string>('JWT_SECRET');
     const accessToken = await this.jwtService.signAsync(jwtPayload, {
       secret,
     });
@@ -121,7 +121,7 @@ export class AuthService {
       role: membership.role,
     };
 
-    const secret = this.configService.get<string>('JWT_SECRET', 'revenew-default-secret');
+    const secret = this.configService.getOrThrow<string>('JWT_SECRET');
     const accessToken = await this.jwtService.signAsync(jwtPayload, {
       secret,
     });

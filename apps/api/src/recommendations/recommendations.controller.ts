@@ -25,7 +25,7 @@ export class RecommendationsController {
   }
 
   @Post('guardrails/evaluate')
-  evaluateGuardrails(@Body() body: EvaluateRecommendationGuardrailsDto) {
+  async evaluateGuardrails(@Body() body: EvaluateRecommendationGuardrailsDto) {
     const decision = this.recommendationsService.evaluateGuardrails(body);
 
     return {

@@ -330,6 +330,7 @@ model Membership {
   roleDefinition Role?        @relation(fields: [roleId], references: [id], onDelete: SetNull)
 
   @@unique([userId, organizationId])
+  @@index([userId])
   @@index([organizationId])
   @@index([role])
   @@map("memberships")

@@ -495,42 +495,42 @@ export class AnalyticsService {
     const { startDate, endDate } = this.resolveDates(input);
 
     const monthlySeries = this.monthSeries(startDate, endDate);
-    const churnByMonth = await Promise.all(
-      monthlySeries.map(async (month) => {
-        const [customersAtStart, customersLostFromSubscriptions] = await Promise.all([
-          this.prisma.customer.count({
-            where: {
-              organizationId: input.organizationId,
-              firstSeen: {
-                lt: month.start,
-              },
-            },
-          }),
-          this.prisma.subscription.count({
-            where: {
-              organizationId: input.organizationId,
-              endDate: {
-                gte: month.start,
-                lte: month.end,
-              },
-              status: SubscriptionStatus.CANCELED,
-            },
-          }),
-        ]);
 
-        const customersLost = Math.min(customersAtStart, customersLostFromSubscriptions);
-
-        return {
-          month: month.key,
-          customersAtStart,
-          customersLost,
-          churnRate: calculateChurnRate({
-            customersAtStart,
-            customersLost,
-          }),
-        };
+    // Two queries for the entire date window instead of 2 × N (one pair per month).
+    const [customersBeforeEnd, canceledInRange] = await Promise.all([
+      this.prisma.customer.findMany({
+        where: {
+          organizationId: input.organizationId,
+          firstSeen: { lt: endDate },
+        },
+        select: { firstSeen: true },
       }),
-    );
+      this.prisma.subscription.findMany({
+        where: {
+          organizationId: input.organizationId,
+          endDate: { gte: startDate, lte: endDate },
+          status: SubscriptionStatus.CANCELED,
+        },
+        select: { endDate: true },
+      }),
+    ]);
+
+    const churnByMonth = monthlySeries.map((month) => {
+      const customersAtStart = customersBeforeEnd.filter(
+        (c) => c.firstSeen < month.start,
+      ).length;
+      const customersLostFromSubscriptions = canceledInRange.filter(
+        (s) => s.endDate != null && s.endDate >= month.start && s.endDate <= month.end,
+      ).length;
+      const customersLost = Math.min(customersAtStart, customersLostFromSubscriptions);
+
+      return {
+        month: month.key,
+        customersAtStart,
+        customersLost,
+        churnRate: calculateChurnRate({ customersAtStart, customersLost }),
+      };
+    });
 
     const totalStart = churnByMonth.reduce((sum, item) => sum + item.customersAtStart, 0);
     const totalLost = churnByMonth.reduce((sum, item) => sum + item.customersLost, 0);

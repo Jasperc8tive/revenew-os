@@ -1,9 +1,11 @@
 import {
+  BillingInterval,
   CampaignStatus,
   CurrencyCode,
   Industry,
   IntegrationProvider,
   IntegrationStatus,
+  IntegrationSyncStatus,
   MarketingChannelType,
   MembershipRole,
   PlanTier,
@@ -48,7 +50,7 @@ async function main() {
           },
           syncLogs: {
             create: {
-              status: "SUCCESS",
+              status: IntegrationSyncStatus.SUCCESS,
             },
           },
         },
@@ -124,7 +126,7 @@ async function main() {
       organizationId: organization.id,
       planId: plan.id,
       status: SubscriptionStatus.ACTIVE,
-      billingInterval: "MONTHLY",
+      billingInterval: BillingInterval.MONTHLY,
       startDate: new Date("2026-04-01"),
     },
   });

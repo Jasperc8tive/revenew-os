@@ -2,6 +2,7 @@
 export const CURRENCIES = {
   NGN: '₦',
   USD: '$',
+  GBP: '£',
   EUR: '€',
 } as const;
 

@@ -36,7 +36,7 @@ export class AgentsController {
   }
 
   @Get('runs')
-  listRuns(@Query() query: ListAgentRunsDto) {
+  async listRuns(@Query() query: ListAgentRunsDto) {
     return this.agentsService.listRuns({
       organizationId: query.organizationId,
       status: query.status,
