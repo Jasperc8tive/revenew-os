@@ -51,7 +51,11 @@
       "Bash(grep -v \"^--$\")",
       "Bash(grep -v \"^$\")",
       "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(48\\).toString\\('hex'\\)\\)\")",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(node -e \"console.log\\(require\\('C:/Users/Mayowa/Documents/Revenew-OS/node_modules/rxjs/package.json'\\).version\\)\")",
+      "Bash(node -e \"console.log\\(require\\('C:/Users/Mayowa/Documents/Revenew-OS/apps/api/node_modules/rxjs/package.json'\\).version\\)\")",
+      "Bash(node -e \"console.log\\('rxjs at root:', require\\('C:/Users/Mayowa/Documents/Revenew-OS/node_modules/rxjs/package.json'\\).version\\)\")",
+      "Bash(node -e \"require\\('C:/Users/Mayowa/Documents/Revenew-OS/node_modules/rxjs/operators'\\); console.log\\('rxjs/operators: OK'\\)\")"
     ]
   }
 }
