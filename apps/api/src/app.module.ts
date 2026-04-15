@@ -1,5 +1,6 @@
 ﻿import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -36,6 +37,9 @@ import { HealthController } from './health.controller';
       envFilePath: resolve(process.cwd(), '..', '..', '.env'),
       validate: validateEnv,
     }),
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60_000, limit: 100 },
+    ]),
     JwtModule.register({ global: true }),
     AnalyticsModule,
     PrismaModule,
@@ -62,6 +66,10 @@ import { HealthController } from './health.controller';
   ],
   controllers: [HealthController],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtGuard,

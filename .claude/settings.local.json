@@ -55,7 +55,12 @@
       "Bash(node -e \"console.log\\(require\\('C:/Users/Mayowa/Documents/Revenew-OS/node_modules/rxjs/package.json'\\).version\\)\")",
       "Bash(node -e \"console.log\\(require\\('C:/Users/Mayowa/Documents/Revenew-OS/apps/api/node_modules/rxjs/package.json'\\).version\\)\")",
       "Bash(node -e \"console.log\\('rxjs at root:', require\\('C:/Users/Mayowa/Documents/Revenew-OS/node_modules/rxjs/package.json'\\).version\\)\")",
-      "Bash(node -e \"require\\('C:/Users/Mayowa/Documents/Revenew-OS/node_modules/rxjs/operators'\\); console.log\\('rxjs/operators: OK'\\)\")"
+      "Bash(node -e \"require\\('C:/Users/Mayowa/Documents/Revenew-OS/node_modules/rxjs/operators'\\); console.log\\('rxjs/operators: OK'\\)\")",
+      "Bash(ls -la /c/Users/Mayowa/Documents/Revenew-OS/*.json)",
+      "Bash(wc -l /c/Users/Mayowa/Documents/Revenew-OS/apps/api/src/**/*.spec.ts)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(netstat -ano)",
+      "Bash(powershell.exe -Command \"Get-Process -Id 9644, 24852 | Select-Object Id, ProcessName, MainWindowTitle\")"
     ]
   }
 }

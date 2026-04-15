@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 function loadWorkspaceEnv() {
@@ -55,6 +56,8 @@ async function bootstrap() {
     .get<string>('ALLOWED_ORIGINS', 'http://localhost:3000')
     .split(',')
     .map((o) => o.trim());
+
+  app.use(helmet());
 
   app.enableCors({
     origin: allowedOrigins,
